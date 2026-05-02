@@ -1,0 +1,87 @@
+const API_BASE = 'http://127.0.0.1:8000';
+
+export async function runPipeline(companyName, options = {}) {
+    const res = await fetch(`${API_BASE}/run-agent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company_name: companyName }),
+        signal: options.signal,
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || `Error ${res.status}`);
+    }
+    return res.json();
+}
+
+export async function getReports(companyName) {
+    const res = await fetch(`${API_BASE}/reports/${encodeURIComponent(companyName)}`);
+    if (!res.ok) throw new Error(`Error ${res.status}`);
+    return res.json();
+}
+
+export async function deleteReport(reportId) {
+    const res = await fetch(`${API_BASE}/reports/${reportId}`, { method: 'DELETE' });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || `Error ${res.status}`);
+    }
+}
+
+export async function getFeatures(companyName) {
+    const res = await fetch(`${API_BASE}/features/${encodeURIComponent(companyName)}`);
+    if (!res.ok) throw new Error(`Error ${res.status}`);
+    return res.json();
+}
+
+export async function getCompetitors() {
+    const res = await fetch(`${API_BASE}/competitors`);
+    if (!res.ok) throw new Error(`Error ${res.status}`);
+    return res.json();
+}
+
+export async function getHealth() {
+    const res = await fetch(`${API_BASE}/health`);
+    if (!res.ok) throw new Error(`Error ${res.status}`);
+    return res.json();
+}
+
+export async function deleteCompetitor(competitorId) {
+    const res = await fetch(`${API_BASE}/competitors/${competitorId}`, {
+        method: 'DELETE',
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || `Error ${res.status}`);
+    }
+    // 204 No Content — nothing to return
+}
+
+export async function createSchedule(data) {
+    const res = await fetch(`${API_BASE}/schedules`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || `Error ${res.status}`);
+    }
+    return res.json();
+}
+
+export async function getSchedules() {
+    const res = await fetch(`${API_BASE}/schedules`);
+    if (!res.ok) throw new Error(`Error ${res.status}`);
+    return res.json();
+}
+
+export async function deleteSchedule(jobId) {
+    const res = await fetch(`${API_BASE}/schedules/${jobId}`, {
+        method: 'DELETE',
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || `Error ${res.status}`);
+    }
+}

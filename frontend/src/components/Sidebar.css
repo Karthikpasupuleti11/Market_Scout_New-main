@@ -1,0 +1,246 @@
+/* ═══════════════════════════════════════════════════════════════════
+   SIDEBAR — Clean Light Intelligence
+   ═══════════════════════════════════════════════════════════════════ */
+
+.sidebar {
+    position: fixed;
+    left: 0;
+    top: var(--header-height);
+    bottom: 0;
+    width: var(--sidebar-width);
+    background: linear-gradient(180deg, #ffffff, #fcfefd);
+    border-right: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+    overflow-y: auto;
+    padding-top: 20px;
+    box-shadow: 6px 0 18px rgba(15, 23, 42, 0.05);
+}
+
+/* ── Brand ─────────────────────────────────────────────────────── */
+
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 22px 20px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.brand-icon-wrapper {
+    position: relative;
+}
+
+.brand-icon {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: hidden;
+    padding: 0;
+}
+
+.brand-logo-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.brand-text h1 {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+}
+
+.brand-subtitle {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+}
+
+/* ── Navigation ────────────────────────────────────────────────── */
+
+.sidebar-nav {
+    flex: 1;
+    padding: 18px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+.nav-section-label {
+    display: block;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #99a6b5;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    padding: 0 12px;
+    margin-bottom: 8px;
+}
+
+/* ── Nav Item ──────────────────────────────────────────────────── */
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    position: relative;
+    text-decoration: none;
+}
+
+.nav-item:hover {
+    color: var(--text-primary);
+    background: var(--bg-input);
+    transform: translateX(2px);
+}
+
+/* Active */
+.nav-item.active {
+    color: var(--accent-primary);
+    background: rgba(46, 125, 50, 0.06);
+    font-weight: 600;
+    border: 1px solid rgba(46, 125, 50, 0.16);
+    box-shadow: 0 4px 14px rgba(46, 125, 50, 0.09);
+}
+
+.nav-item.active .nav-icon {
+    color: var(--accent-primary);
+}
+
+/* Left active indicator */
+.nav-indicator {
+    position: absolute;
+    left: -13px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 20px;
+    background: var(--accent-primary);
+    border-radius: 0 4px 4px 0;
+}
+
+/* Icon */
+.nav-icon {
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s;
+}
+
+/* ── External Links ────────────────────────────────────────────── */
+
+.nav-item.external:hover {
+    background: var(--bg-input);
+}
+
+.nav-external-badge {
+    margin-left: auto;
+    font-size: 0.7rem;
+    color: var(--text-faint);
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.nav-item.external:hover .nav-external-badge {
+    opacity: 1;
+    color: var(--text-muted);
+}
+
+/* ── Footer ────────────────────────────────────────────────────── */
+
+/* ── Settings Button ──────────────────────────────────────────── */
+.sidebar-settings-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 12px 0;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    background: transparent;
+    color: #1A1D23;
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.sidebar-settings-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-input);
+    transform: translateX(2px);
+}
+
+.sidebar-settings-btn:hover .settings-gear-icon {
+    animation: spin-slow 2s linear infinite;
+}
+
+.sidebar-settings-btn.active {
+    color: var(--accent-primary);
+    background: var(--accent-soft);
+    border-color: rgba(46, 125, 50, 0.16);
+}
+
+.settings-gear-icon {
+    font-size: 1.1rem;
+    color: #1A1D23;
+    transition: color 0.15s;
+}
+
+@keyframes spin-slow {
+    to { transform: rotate(360deg); }
+}
+
+.sidebar-footer {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.footer-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent-primary);
+    box-shadow: 0 0 4px rgba(46, 125, 50, 0.4);
+    animation: pulse-glow 2.5s ease infinite;
+}
+
+.footer-badge {
+    padding: 3px 10px;
+    background: var(--accent-soft);
+    color: var(--accent-primary);
+    border-radius: 6px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}

@@ -1,0 +1,292 @@
+/* ═══════════════════════════════════════════════════════════════════
+   REPORTS PAGE — Phase 2: Scannable Intelligence Archives
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Search ────────────────────────────────────────────────────── */
+
+.reports-page {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.reports-hero-strip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    padding: 16px;
+    margin-bottom: 4px;
+    background:
+        radial-gradient(circle at 0% 100%, rgba(46, 125, 50, 0.08), transparent 42%),
+        radial-gradient(circle at 100% 0%, rgba(25, 118, 210, 0.08), transparent 42%),
+        #ffffff;
+}
+
+.reports-hero-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+}
+
+.reports-hero-item span {
+    color: var(--text-muted);
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.7px;
+}
+
+.reports-hero-item strong {
+    color: var(--text-primary);
+    font-size: 0.86rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 65%;
+}
+
+.report-search-card {
+    padding: 24px;
+    margin-bottom: 14px;
+}
+
+.report-search-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.report-search-wrapper {
+    flex: 1;
+    position: relative;
+}
+
+.report-search-icon {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.1rem;
+    color: var(--accent-primary);
+    z-index: 1;
+}
+
+.report-search-input {
+    height: 52px;
+    padding-left: 48px !important;
+    font-size: 0.9375rem;
+}
+
+.report-search-btn {
+    height: 52px;
+    padding: 0 28px;
+}
+
+
+/* ── Reports List ──────────────────────────────────────────────── */
+
+.reports-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+
+/* ── Report Card ───────────────────────────────────────────────── */
+
+.report-card {
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.report-card:hover {
+    transform: translateY(-2px);
+}
+
+.report-card.open {
+    border-color: var(--border-accent);
+    box-shadow: var(--shadow-glow);
+}
+
+.reports-loading-card {
+    text-align: center;
+    padding: 48px 24px;
+    margin-top: 6px;
+}
+
+.reports-loading-card p {
+    color: var(--text-secondary);
+}
+
+.reports-loading-spinner {
+    margin: 0 auto 12px;
+}
+
+.report-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 4px 0;
+}
+
+.report-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius-md);
+    background: var(--accent-soft);
+    color: var(--accent-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.report-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.report-info h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.report-meta-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.meta-dot {
+    color: var(--text-faint);
+}
+
+.report-conf {
+    font-weight: 700;
+    font-family: var(--font-mono);
+}
+
+.report-conf.high { color: var(--success); }
+.report-conf.mid  { color: var(--warning); }
+.report-conf.low  { color: var(--error); }
+
+.report-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.report-expand-icon {
+    font-size: 1rem;
+    color: var(--text-muted);
+    transition: color 0.2s;
+}
+
+.report-card:hover .report-expand-icon {
+    color: var(--text-primary);
+}
+
+
+/* ── Insight Preview (always visible, below header) ────────────── */
+
+.report-insight-preview {
+    font-size: 0.8125rem;
+    line-height: 1.55;
+    color: var(--text-muted);
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-subtle);
+    width: 100%;
+}
+
+
+/* ── Expanded Details ──────────────────────────────────────────── */
+
+.report-details {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.report-summary-section h4,
+.report-sources-section h4 {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--accent-primary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+}
+
+.report-summary-section p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    width: 100%;
+}
+
+.report-sources-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* Reuses .evidence-item from RunPipeline.css */
+.report-sources-list .evidence-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-input);
+    transition: all 0.2s;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    word-break: break-all;
+    text-decoration: none;
+}
+
+.report-sources-list .evidence-item:hover {
+    background: rgba(46, 125, 50, 0.03);
+    border-color: var(--border-accent);
+    color: var(--accent-primary);
+}
+
+.report-sources-list .evidence-link-icon {
+    font-size: 0.9rem;
+    flex-shrink: 0;
+    color: var(--accent-primary);
+}
+
+
+/* ── Responsive ────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+    .reports-hero-strip {
+        grid-template-columns: 1fr;
+    }
+
+    .report-search-row {
+        flex-direction: column;
+    }
+    .report-card-header {
+        flex-wrap: wrap;
+    }
+}
