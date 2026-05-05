@@ -19,6 +19,7 @@ const PRIMARY_NAV = [
     { path: '/analysis',    label: 'Analysis',      icon: <HiOutlineChartBar /> },
     { path: '/reports',     label: 'Reports',       icon: <HiOutlineDocumentText /> },
     { path: '/watchlist',   label: 'Watchlist',     icon: <HiOutlineEye /> },
+    { path: '/rag', label: 'Ask Report', icon: <HiOutlineDocumentText /> }
 ];
 
 const SECONDARY_NAV = [

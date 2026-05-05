@@ -85,3 +85,34 @@ export async function deleteSchedule(jobId) {
         throw new Error(err.detail || `Error ${res.status}`);
     }
 }
+
+// 🔹 RAG: Upload PDF
+export async function uploadRagPDF(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch(`${API_BASE}/rag/upload`, {
+        method: 'POST',
+        body: formData,
+    });
+
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || `Error ${res.status}`);
+    }
+
+    return res.json();
+}
+
+
+// 🔹 RAG: Ask Question
+export async function askRagQuestion(query) {
+    const res = await fetch(`${API_BASE}/rag/ask?query=${encodeURIComponent(query)}`);
+
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || `Error ${res.status}`);
+    }
+
+    return res.json();
+}

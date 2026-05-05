@@ -157,6 +157,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# ✅ MOVE INSIDE FUNCTION STYLE (IMPORTANT)
+def register_routes(app):
+    from app.rag.routes import router as rag_router
+    app.include_router(rag_router)
+
+register_routes(app)
+
 # CORS
 app.add_middleware(
     CORSMiddleware,
