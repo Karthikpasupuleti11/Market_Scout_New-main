@@ -169,7 +169,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
     "http://localhost:5173",
-    "https://market-scout.me"
+    "https://market-scout.me",
+    "https://market-scout-new-main.vercel.app"
     ],
     allow_credentials=True,
     allow_methods=["*"],
