@@ -171,6 +171,7 @@ app.add_middleware(
     allow_origins=[
     "http://localhost:5173",
     "https://market-scout.me",
+    "https://www.market-scout.me",
     "https://market-scout-new-main.vercel.app"
     ],
     allow_credentials=True,
