@@ -12,6 +12,7 @@ Production-ready API with:
 
 import time
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -235,14 +236,15 @@ def health_check():
     tags=["Intelligence"],
     summary="Run Market Intelligence Pipeline",
 )
-def run_agent(request: AgentRequest):
+async def run_agent(request: AgentRequest):
     """Execute the full intelligence pipeline for a given company."""
     logger.info("API — Pipeline invoked for: '%s'", request.company_name)
     ACTIVE_PIPELINES.inc()
 
     try:
         graph = app.state.graph
-        result = graph.invoke({"company_name": request.company_name})
+        # Run the pipeline in a thread pool to avoid blocking the event loop
+        result = await asyncio.to_thread(graph.invoke, {"company_name": request.company_name})
 
         report = result.get("synthesis_report", {})
         if not report:
