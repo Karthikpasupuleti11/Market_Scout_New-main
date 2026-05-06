@@ -8,7 +8,10 @@
     display: flex;
     flex-direction: column;
     gap: 14px;
-    height: 100%;
+    /* Lock to the exact viewport space: 100vh minus top-bar, padding, and a small buffer */
+    height: calc(100vh - var(--header-height) - 72px);
+    max-height: calc(100vh - var(--header-height) - 72px);
+    overflow: hidden;
 }
 
 /* ── Upload Card ────────────────────────────────────────────────── */
@@ -129,6 +132,7 @@
     border: 1px solid var(--border-default);
     border-radius: var(--radius-md);
     overflow: hidden;
+    /* Allow flex shrinking so chat box never overflows the container */
     min-height: 0;
 }
 

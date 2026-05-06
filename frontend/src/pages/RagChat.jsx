@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { uploadRagPDF, askRagQuestion } from "../api";
 import "./RagChat.css";
 
@@ -7,6 +7,12 @@ export default function RagChat() {
     const [question, setQuestion] = useState("");
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(false);
+    const messagesEndRef = useRef(null);
+
+    // Auto-scroll to the bottom of the chat when messages change
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages, loading]);
 
     const handleUpload = async () => {
         if (!file) return alert("Select a file");
@@ -135,6 +141,9 @@ export default function RagChat() {
                             </div>
                         </div>
                     )}
+
+                    {/* Invisible anchor for auto-scrolling */}
+                    <div ref={messagesEndRef} />
                 </div>
 
                 {/* Input — inside chat box, pinned to bottom */}
