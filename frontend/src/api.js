@@ -114,5 +114,5 @@ export async function askRagQuestion(query) {
         throw new Error(err.detail || `Error ${res.status}`);
     }
 
-    return res.json();
+    return res.json();  
 }

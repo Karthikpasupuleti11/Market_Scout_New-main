@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, Link } from 'react-router-dom';
 import { HiOutlineBell, HiOutlineInformationCircle } from 'react-icons/hi';
 import { SettingsProvider } from './contexts/SettingsContext';
+import { PipelineProvider } from './contexts/PipelineContext';   // ← NEW
 import Sidebar from './components/Sidebar';
 import GuidedTour, { hasTourBeenSeen } from './components/GuidedTour';
 import Dashboard from './pages/Dashboard';
@@ -11,7 +12,7 @@ import Reports from './pages/Reports';
 import Competitors from './pages/Competitors';
 import Schedule from './pages/Schedule';
 import About from './pages/About';
-import RagChat from "./pages/RagChat";
+import RagChat from './pages/RagChat';
 
 
 function TopBar({ onStartTour }) {
@@ -32,7 +33,6 @@ function TopBar({ onStartTour }) {
           <HiOutlineInformationCircle />
           <span>About Us</span>
         </NavLink>
-        {/* Help / Tour button — always visible */}
         <button
           className="tour-help-btn"
           onClick={onStartTour}
@@ -56,10 +56,8 @@ function TopBar({ onStartTour }) {
 function AppContent() {
   const [tourOpen, setTourOpen] = useState(false);
 
-  // Auto-start tour on first visit
   useEffect(() => {
     if (!hasTourBeenSeen()) {
-      // Small delay so DOM renders first
       const timer = setTimeout(() => setTourOpen(true), 800);
       return () => clearTimeout(timer);
     }
@@ -79,7 +77,6 @@ function AppContent() {
             <Route path="/reports" element={<Reports />} />
             <Route path="/watchlist" element={<Competitors />} />
             <Route path="/about" element={<About />} />
-            {/* Legacy routes redirect */}
             <Route path="/run" element={<RunPipeline />} />
             <Route path="/competitors" element={<Competitors />} />
             <Route path="/rag" element={<RagChat />} />
@@ -87,7 +84,6 @@ function AppContent() {
         </main>
       </div>
 
-      {/* Guided Tour — renders above everything */}
       <GuidedTour
         isOpen={tourOpen}
         onClose={() => setTourOpen(false)}
@@ -99,9 +95,13 @@ function AppContent() {
 export default function App() {
   return (
     <SettingsProvider>
-      <BrowserRouter>
-        <AppContent />
-      </BrowserRouter>
+      {/* PipelineProvider sits OUTSIDE BrowserRouter so state survives
+          route changes — the fetch + timers live here, not in the page */}
+      <PipelineProvider>
+        <BrowserRouter>
+          <AppContent />
+        </BrowserRouter>
+      </PipelineProvider>
     </SettingsProvider>
   );
 }
