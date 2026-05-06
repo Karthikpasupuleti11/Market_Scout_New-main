@@ -68,6 +68,13 @@ class AgentRequest(BaseModel):
         description="Name of the company to analyse",
         examples=["OpenAI", "Google DeepMind", "Anthropic"],
     )
+    date_window_days: int = Field(
+        7,
+        ge=1,
+        le=365,
+        description="Recency window (in days) used for date validation + scoring + synthesis",
+        examples=[7, 14, 30],
+    )
 
 
 class FeatureItem(BaseModel):
@@ -222,6 +229,37 @@ def root():
     }
 
 
+@app.post("/system/clear-cache", tags=["System"], summary="Clear Redis Cache")
+def clear_cache():
+    """Flush all keys in the current Redis database."""
+    try:
+        from cache.redis_client import get_redis
+        get_redis().flushdb()
+        return {"status": "success", "message": "Redis cache cleared."}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to clear cache: {str(exc)}")
+
+
+@app.post("/system/clear-storage", tags=["System"], summary="Clear Database Storage")
+def clear_storage(db: Session = Depends(get_db)):
+    """Delete all competitors, reports, features, and scheduled jobs from the PostgreSQL database."""
+    try:
+        from database.models import Competitor, Report, Feature
+        from database.scheduled_job_model import ScheduledJob
+        
+        # Explicitly delete all to avoid FK issues
+        db.query(Feature).delete()
+        db.query(Report).delete()
+        db.query(Competitor).delete()
+        db.query(ScheduledJob).delete()
+        
+        db.commit()
+        return {"status": "success", "message": "Database storage cleared."}
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to clear storage: {str(exc)}")
+
+
 @app.get("/health", response_model=HealthResponse, tags=["System"])
 def health_check():
     return HealthResponse(
@@ -245,7 +283,13 @@ async def run_agent(request: AgentRequest):
     try:
         graph = app.state.graph
         # Run the pipeline in a thread pool to avoid blocking the event loop
-        result = await asyncio.to_thread(graph.invoke, {"company_name": request.company_name})
+        result = await asyncio.to_thread(
+            graph.invoke,
+            {
+                "company_name": request.company_name,
+                "date_window_days": request.date_window_days,
+            },
+        )
 
         report = result.get("synthesis_report", {})
         if not report:

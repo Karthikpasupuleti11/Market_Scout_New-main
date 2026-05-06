@@ -4,7 +4,10 @@ export async function runPipeline(companyName, options = {}) {
     const res = await fetch(`${API_BASE}/run-agent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ company_name: companyName }),
+        body: JSON.stringify({
+            company_name: companyName,
+            date_window_days: options.dateWindowDays,
+        }),
         signal: options.signal,
     });
     if (!res.ok) {
@@ -115,4 +118,24 @@ export async function askRagQuestion(query) {
     }
 
     return res.json();  
+}
+
+// 🔹 SYSTEM: Clear Cache
+export async function clearCache() {
+    const res = await fetch(`${API_BASE}/system/clear-cache`, { method: 'POST' });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || `Error ${res.status}`);
+    }
+    return res.json();
+}
+
+// 🔹 SYSTEM: Clear Storage
+export async function clearStorage() {
+    const res = await fetch(`${API_BASE}/system/clear-storage`, { method: 'POST' });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || `Error ${res.status}`);
+    }
+    return res.json();
 }

@@ -117,7 +117,7 @@ export default function GuidedTour({ isOpen, onClose }) {
       {/* Dark mask with spotlight cutout */}
       {targetRect ? (
         <svg className="tour-mask" viewBox={`0 0 ${window.innerWidth} ${window.innerHeight}`}
-             preserveAspectRatio="none">
+          preserveAspectRatio="none">
           <defs>
             <mask id="tour-spotlight">
               <rect width="100%" height="100%" fill="white" />
@@ -211,8 +211,10 @@ function computeLayout(targetRect, position) {
   const tcy = targetRect.top + targetRect.height / 2;
 
   let ttop, tleft;
-  const arrowStyle = { position: 'absolute', width: 14, height: 14, background: '#FFFFFF',
-    border: '1px solid var(--border-default)', transform: 'rotate(45deg)', zIndex: -1 };
+  const arrowStyle = {
+    position: 'absolute', width: 14, height: 14, background: '#FFFFFF',
+    border: '1px solid var(--border-default)', transform: 'rotate(45deg)', zIndex: -1
+  };
 
   if (position === 'bottom') {
     ttop = targetRect.top + targetRect.height + pad;

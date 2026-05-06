@@ -161,16 +161,6 @@ export default function RunPipeline() {
         if (!report?.features?.length) return [];
         let signals = [...report.features];
 
-        const enabledCategories = settings.analysis.defaultCategories;
-        signals = signals.filter(f => {
-            const cat = (f.category || '').toLowerCase();
-            if (cat.includes('ai') || cat.includes('model') || cat.includes('llm')) return enabledCategories.ai;
-            if (cat.includes('infra') || cat.includes('cloud')) return enabledCategories.infrastructure;
-            if (cat.includes('security') || cat.includes('privacy')) return enabledCategories.security;
-            if (cat.includes('developer') || cat.includes('api') || cat.includes('sdk')) return enabledCategories.developer;
-            return true;
-        });
-
         if (filterCategory !== 'all') {
             signals = signals.filter(f => (f.category || 'General') === filterCategory);
         }
@@ -452,7 +442,6 @@ export default function RunPipeline() {
                                         index={i}
                                         isExpanded={expandedSignals.has(i)}
                                         onToggle={() => toggleSignal(i)}
-                                        detailLevel={settings.reports.detailLevel}
                                     />
                                 ))}
                             </div>
@@ -467,7 +456,7 @@ export default function RunPipeline() {
                         </div>
                     )}
 
-                    {settings.reports.includeSources && report.all_sources && report.all_sources.length > 0 && (
+                    {report.all_sources && report.all_sources.length > 0 && (
                         <div className="card evidence-section fade-in-up">
                             <button
                                 className="evidence-toggle"
@@ -504,7 +493,7 @@ export default function RunPipeline() {
 }
 
 /* ── Signal Card ────────────────────────────────────────────────── */
-function SignalCard({ signal: f, index, isExpanded, onToggle, detailLevel = 'detailed' }) {
+function SignalCard({ signal: f, index, isExpanded, onToggle }) {
     const score = f.confidence_score ?? f.confidence;
     const pct = score != null ? Math.round(score * 100) : null;
     const level = score >= 0.7 ? 'high' : score >= 0.4 ? 'mid' : 'low';
@@ -541,14 +530,14 @@ function SignalCard({ signal: f, index, isExpanded, onToggle, detailLevel = 'det
                             {f.description || f.feature_summary}
                         </p>
                     )}
-                    {detailLevel === 'detailed' && f.impact_assessment && (
+                    {f.impact_assessment && (
                         <div className="signal-impact">
                             <span className="impact-label">Impact</span>
                             <span className="impact-text">{f.impact_assessment}</span>
                         </div>
                     )}
                     <div className="signal-footer">
-                        {detailLevel === 'detailed' && f.key_metrics && f.key_metrics.length > 0 && (
+                        {f.key_metrics && f.key_metrics.length > 0 && (
                             <div className="signal-metrics">
                                 {f.key_metrics.map((m, j) => (
                                     <span key={j} className="metric-chip">{m}</span>

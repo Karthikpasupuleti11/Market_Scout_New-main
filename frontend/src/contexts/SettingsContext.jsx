@@ -12,35 +12,11 @@ const DEFAULT_SETTINGS = {
   analysis: {
     timeWindow: 7,              // 7 | 14 | 30 days
     confidenceThreshold: 50,    // 50–90 slider (percentage)
-    sourceDepth: 'balanced',    // 'light' | 'balanced' | 'deep'
-    defaultCategories: {
-      ai: true,
-      infrastructure: true,
-      security: true,
-      developer: true,
-    },
   },
 
-  // ── 2. Reports ──────────────────────────────────────────────────
-  reports: {
-    detailLevel: 'detailed',    // 'compact' | 'detailed'
-    includeSources: true,       // toggle
-    exportFormat: 'pdf',        // 'pdf' (future: 'json', 'csv')
-  },
-
-  // ── 3. Watchlist ────────────────────────────────────────────────
+  // ── 2. Watchlist ────────────────────────────────────────────────
   watchlist: {
-    autoAdd: true,              // auto-add analyzed companies
     defaultSort: 'recent',      // 'recent' | 'signal' | 'confidence'
-    highlightHighConfidence: false,
-  },
-
-  // ── 4. Profile & UI (non-functional placeholders) ──────────────
-  profile: {
-    name: 'User',
-    email: 'user@example.com',
-    theme: 'light',             // 'dark' | 'light' | 'auto'
-    density: 'comfortable',     // 'comfortable' | 'compact'
   },
 };
 
@@ -72,22 +48,7 @@ export function SettingsProvider({ children }) {
   }, []);
 
   const updateAnalysis = useCallback((patch) => updateSection('analysis', patch), [updateSection]);
-  const updateReports = useCallback((patch) => updateSection('reports', patch), [updateSection]);
   const updateWatchlist = useCallback((patch) => updateSection('watchlist', patch), [updateSection]);
-  const updateProfile = useCallback((patch) => updateSection('profile', patch), [updateSection]);
-
-  const toggleCategory = useCallback((category) => {
-    setSettings(prev => ({
-      ...prev,
-      analysis: {
-        ...prev.analysis,
-        defaultCategories: {
-          ...prev.analysis.defaultCategories,
-          [category]: !prev.analysis.defaultCategories[category],
-        },
-      },
-    }));
-  }, []);
 
   const resetToDefaults = useCallback(() => {
     setSettings(DEFAULT_SETTINGS);
@@ -97,10 +58,7 @@ export function SettingsProvider({ children }) {
     <SettingsContext.Provider value={{
       settings,
       updateAnalysis,
-      updateReports,
       updateWatchlist,
-      updateProfile,
-      toggleCategory,
       resetToDefaults,
     }}>
       {children}

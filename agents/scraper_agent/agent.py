@@ -8,6 +8,7 @@ from .memory import get_article, save_article, load_agent_memory, save_agent_mem
 from .planner import decide_strategy
 from .critic import is_technical
 from .tools import newspaper, bs4, playwright
+from observability.metrics import SCRAPER_ATTEMPTS
 
 logger = logging.getLogger(__name__)
 
@@ -44,11 +45,14 @@ def process_single_url(item, company):
 
             if result and result.get("text"):
                 logger.info("SCRAPER — Tool succeeded: %s", strategy)
+                SCRAPER_ATTEMPTS.labels(strategy=strategy, status="success").inc()
                 break
 
+            SCRAPER_ATTEMPTS.labels(strategy=strategy, status="failure").inc()
             failures += 1
 
         except Exception as e:
+            SCRAPER_ATTEMPTS.labels(strategy=strategy, status="failure").inc()
             failures += 1
             logger.debug("SCRAPER — Tool exception | %s | %s", strategy, str(e))
 

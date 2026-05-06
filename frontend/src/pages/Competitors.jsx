@@ -152,12 +152,9 @@ export default function Competitors() {
                                 : data.summary
                             : null;
 
-                        const isHighlighted = settings.watchlist.highlightHighConfidence
-                            ? (data?.signals || 0) >= 8
-                            : true;
 
                         return (
-                            <div key={comp.id || i} className={`card watchlist-card fade-in-up ${!isHighlighted ? 'dimmed' : ''}`}>
+                            <div key={comp.id || i} className={`card watchlist-card fade-in-up`}>
                                 {/* Top row: avatar + name + strength */}
                                 <div className="wl-card-top">
                                     <div className="comp-avatar">

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useRef, useCallback } from 'react';
 import { runPipeline } from '../api';
+import { useSettings } from './SettingsContext';
 
 /* ═══════════════════════════════════════════════════════════════════
    PIPELINE CONTEXT — Persists pipeline execution state across routes
@@ -9,6 +10,8 @@ import { runPipeline } from '../api';
 const PipelineContext = createContext(null);
 
 export function PipelineProvider({ children }) {
+    const { settings } = useSettings();
+
     // ── Core execution state ─────────────────────────────────────
     const [company, setCompany] = useState('');
     const [loading, setLoading] = useState(false);
@@ -66,6 +69,7 @@ export function PipelineProvider({ children }) {
         try {
             const data = await runPipeline(companyName.trim(), {
                 signal: abortControllerRef.current.signal,
+                dateWindowDays: settings.analysis.timeWindow,
             });
             setResult(data);
         } catch (err) {
@@ -79,7 +83,7 @@ export function PipelineProvider({ children }) {
             stopClocks();
             setLoading(false);
         }
-    }, [startClocks, stopClocks]);
+    }, [settings.analysis.timeWindow, startClocks, stopClocks]);
 
     // ── Public: stop the running pipeline ────────────────────────
     const stopPipeline = useCallback(() => {

@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 # Scoring Functions
 # ────────────────────────────────────────────────────────────────────
 
-def _recency_score(publish_date_str: str, now: datetime) -> float:
+def _recency_score(publish_date_str: str, now: datetime, date_window_days: int) -> float:
     """Calculate recency score with linear decay.
 
     1 day old → 1.0
@@ -54,9 +54,9 @@ def _recency_score(publish_date_str: str, now: datetime) -> float:
             return 1.0
         if days_old <= 1:
             return 1.0
-        if days_old <= settings.DATE_WINDOW_DAYS:
+        if days_old <= date_window_days:
             # Linear decay from 1.0 to 0.5 over the 7-day window
-            return max(0.5, 1.0 - (days_old / settings.DATE_WINDOW_DAYS) * 0.5)
+            return max(0.5, 1.0 - (days_old / date_window_days) * 0.5)
         return 0.3  # Beyond window (shouldn't happen if date validation works)
 
     except (ValueError, OverflowError):
@@ -98,6 +98,7 @@ def confidence_scoring_node(state: GraphState) -> Dict[str, Any]:
       Confidence = (Recency × 0.4) + (Verification × 0.3) + (Authority × 0.3)
     """
     verified = state.get("verified_features", [])
+    date_window_days = int(state.get("date_window_days") or settings.DATE_WINDOW_DAYS)
     now = datetime.now(timezone.utc)
 
     logger.info("SCORING — Calculating confidence for %d features", len(verified))
@@ -109,7 +110,7 @@ def confidence_scoring_node(state: GraphState) -> Dict[str, Any]:
 
     for feature in verified:
         # ── Component scores ───────────────────────────────────────
-        recency = _recency_score(feature.get("publish_date"), now)
+        recency = _recency_score(feature.get("publish_date"), now, date_window_days)
         verification = _verification_score(feature.get("source_count", 1))
         authority = _authority_score(feature.get("source_authority", 0.5))
 

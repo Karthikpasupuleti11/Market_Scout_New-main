@@ -16,8 +16,10 @@ import {
     HiOutlineArrowRight,
     HiOutlineOfficeBuilding,
     HiOutlineDocumentReport,
-    HiOutlineAnnotation
+    HiOutlineAnnotation,
+    HiOutlineX
 } from 'react-icons/hi';
+import { useState } from 'react';
 import './About.css';
 
 const capabilities = [
@@ -97,22 +99,18 @@ const valueProps = [
 ];
 
 export default function About() {
+    const [selectedCapability, setSelectedCapability] = useState(null);
+
     return (
         <div className="about-page fade-in">
-            <div className="page-header">
-                <h1>About Market Scout</h1>
-                <p>
-                    Market Scout is an intelligence platform designed to help teams monitor companies, analyze movement in the
-                    market, and turn raw updates into practical insights.
-                </p>
-            </div>
+
 
             <section className="about-visual-strip fade-in-up">
                 <div className="about-orb orb-1" />
                 <div className="about-orb orb-2" />
                 <div className="about-orb orb-3" />
                 <div className="about-strip-content">
-                    <h2>Market Intelligence. Structured for action.</h2>
+                    <h1>Market Intelligence. Structured for action.</h1>
                     <p>
                         From discovery to reporting, every stage is designed to turn noisy market activity into usable,
                         decision-ready intelligence.
@@ -189,7 +187,12 @@ export default function About() {
 
             <section className="about-capabilities">
                 {capabilities.map((item, index) => (
-                    <article className="card capability-card fade-in-up" key={item.title} style={{ animationDelay: `${0.06 * index}s` }}>
+                    <article
+                        className="card capability-card fade-in-up clickable"
+                        key={item.title}
+                        style={{ animationDelay: `${0.06 * index}s` }}
+                        onClick={() => setSelectedCapability(item)}
+                    >
                         <div className="capability-icon">{item.icon}</div>
                         <h3>{item.title}</h3>
                         <p>{item.text}</p>
@@ -232,6 +235,23 @@ export default function About() {
                     </div>
                 </div>
             </section>
+
+            {/* Modal for Core Capabilities */}
+            {selectedCapability && (
+                <div className="about-modal-overlay fade-in" onClick={() => setSelectedCapability(null)}>
+                    <div className="about-modal-content fade-in-up" onClick={(e) => e.stopPropagation()}>
+                        <button className="about-modal-close" onClick={() => setSelectedCapability(null)}>
+                            <HiOutlineX />
+                        </button>
+                        <div className="about-modal-icon">{selectedCapability.icon}</div>
+                        <h2>{selectedCapability.title}</h2>
+                        <p className="about-modal-desc">{selectedCapability.text}</p>
+                        <div className="about-modal-detail">
+                            This module is a core part of the Market Scout platform, designed to streamline your daily workflow and provide actionable strategic intelligence.
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

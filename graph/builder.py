@@ -147,7 +147,8 @@ def _no_articles_node(state: GraphState) -> Dict[str, Any]:
 
 def _all_expired_node(state: GraphState) -> Dict[str, Any]:
     company = state.get('company_name', 'Unknown')
-    msg = f"All articles for '{company}' are older than 7 days."
+    window = int(state.get("date_window_days") or 7)
+    msg = f"All articles for '{company}' are older than {window} days."
     return _make_empty_report(company, msg)
 
 

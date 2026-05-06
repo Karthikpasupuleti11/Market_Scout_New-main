@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useSettings } from '../contexts/SettingsContext';
+
 import {
   HiOutlineSearch,
   HiOutlineDocumentText,
@@ -18,7 +18,7 @@ import './Reports.css';
 
 export default function Reports() {
   const navigate = useNavigate();
-  const { settings } = useSettings();
+
   const [company, setCompany] = useState("");
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -230,7 +230,7 @@ export default function Reports() {
                         <p>{report.executive_summary}</p>
                       </div>
                     )}
-                    {settings.reports.includeSources && report.all_sources && report.all_sources.length > 0 && (
+                    {report.all_sources && report.all_sources.length > 0 && (
                       <div className="report-sources-section">
                         <h4>Sources ({report.all_sources.length})</h4>
                         <div className="report-sources-list">

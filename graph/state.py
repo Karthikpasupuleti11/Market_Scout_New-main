@@ -77,6 +77,7 @@ class GraphState(TypedDict, total=False):
 
     # ── Input ──────────────────────────────────────────────────────
     company_name: str                         # Sanitised company name (guardrails)
+    date_window_days: int                     # Recency window (e.g., 7 | 14 | 30)
 
     # ── Search Planner Agent output ────────────────────────────────
     search_queries: List[str]                 # 3-4 semantic search queries

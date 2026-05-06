@@ -34,15 +34,16 @@ def date_validation_node(state: GraphState) -> Dict[str, Any]:
     Output: state["filtered_results"], state["discarded_urls"]
     """
     articles = state.get("scraped_articles", [])
+    date_window_days = int(state.get("date_window_days") or settings.DATE_WINDOW_DAYS)
     now = datetime.now(timezone.utc)
-    cutoff = now - timedelta(days=settings.DATE_WINDOW_DAYS)
+    cutoff = now - timedelta(days=date_window_days)
 
     valid: List[Dict[str, Any]] = []
     discarded: List[Dict[str, Any]] = []
 
     logger.info(
         "DATE VALIDATION — Checking %d articles against %d-day window (cutoff: %s)",
-        len(articles), settings.DATE_WINDOW_DAYS, cutoff.isoformat(),
+        len(articles), date_window_days, cutoff.isoformat(),
     )
 
     for article in articles:
@@ -70,7 +71,7 @@ def date_validation_node(state: GraphState) -> Dict[str, Any]:
                 valid.append(article)
                 logger.debug("DATE VALIDATION — PASS: %s (published %s)", url[:60], pub_date.date())
             else:
-                reason = f"Article older than {settings.DATE_WINDOW_DAYS} days (published {pub_date.date()})"
+                reason = f"Article older than {date_window_days} days (published {pub_date.date()})"
                 discard_entry = {
                     "url": url,
                     "reason": reason,

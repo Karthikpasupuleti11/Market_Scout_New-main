@@ -8,6 +8,7 @@ import {
     HiOutlineClock,
     HiOutlineChartBar,
     HiOutlineCog,
+    HiOutlineChatAlt2,
 } from 'react-icons/hi';
 import { SiPrometheus, SiGrafana } from 'react-icons/si';
 import SettingsPanel from './SettingsPanel';
@@ -18,8 +19,8 @@ const PRIMARY_NAV = [
     { path: '/intelligence', label: 'Intelligence',  icon: <HiOutlineLightningBolt /> },
     { path: '/analysis',    label: 'Analysis',      icon: <HiOutlineChartBar /> },
     { path: '/reports',     label: 'Reports',       icon: <HiOutlineDocumentText /> },
+    { path: '/rag',         label: 'Report Assistant', icon: <HiOutlineChatAlt2 /> },
     { path: '/watchlist',   label: 'Watchlist',     icon: <HiOutlineEye /> },
-    { path: '/rag', label: 'Ask Report', icon: <HiOutlineDocumentText /> }
 ];
 
 const SECONDARY_NAV = [

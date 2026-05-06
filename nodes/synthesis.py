@@ -66,6 +66,7 @@ def synthesis_node(state: GraphState) -> Dict[str, Any]:
     """
     scored_features = state.get("scored_features", [])
     company_name = state.get("company_name", "")
+    date_window_days = int(state.get("date_window_days") or settings.DATE_WINDOW_DAYS)
     now = datetime.now(timezone.utc)
 
     logger.info(
@@ -74,7 +75,7 @@ def synthesis_node(state: GraphState) -> Dict[str, Any]:
     )
 
     # ── Cache check ────────────────────────────────────────────────
-    cache_key = make_cache_key("report", company_name)
+    cache_key = make_cache_key("report", f"{company_name}:{date_window_days}d")
     cached = get_cache(cache_key)
     if cached:
         logger.info("SYNTHESIS — Cache hit, returning cached report")
@@ -87,7 +88,7 @@ def synthesis_node(state: GraphState) -> Dict[str, Any]:
             "generated_at": now.isoformat(),
             "executive_summary": (
                 f"No verified technical feature updates were found for "
-                f"{company_name} within the last {settings.DATE_WINDOW_DAYS} days. "
+                f"{company_name} within the last {date_window_days} days. "
                 f"This may indicate a quiet release period or that updates were "
                 f"published on channels outside our monitoring scope."
             ),
@@ -97,7 +98,7 @@ def synthesis_node(state: GraphState) -> Dict[str, Any]:
             "metadata": {
                 "pipeline_version": "2.0",
                 "model": settings.LLM_MODEL,
-                "date_window_days": settings.DATE_WINDOW_DAYS,
+                "date_window_days": date_window_days,
             },
         }
         set_cache(cache_key, report)
@@ -182,7 +183,7 @@ Return ONLY the JSON. No preamble."""
         llm_report = {
             "executive_summary": (
                 f"{company_name} has released {len(scored_features)} verified "
-                f"technical updates in the past {settings.DATE_WINDOW_DAYS} days. "
+                f"technical updates in the past {date_window_days} days. "
                 f"Features have been cross-verified across "
                 f"{sum(f.get('source_count', 1) for f in scored_features)} sources."
             ),
@@ -221,7 +222,7 @@ Return ONLY the JSON. No preamble."""
         "metadata": {
             "pipeline_version": "2.0",
             "model": settings.LLM_MODEL,
-            "date_window_days": settings.DATE_WINDOW_DAYS,
+            "date_window_days": date_window_days,
             "similarity_threshold": settings.SIMILARITY_THRESHOLD,
             "discarded_urls_count": len(state.get("discarded_urls", [])),
         },
