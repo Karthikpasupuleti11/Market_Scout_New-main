@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useSettings } from '../contexts/SettingsContext';
+import { usePipeline } from '../contexts/PipelineContext';   // ← NEW
 import {
     HiOutlineLightningBolt,
     HiOutlineExternalLink,
@@ -12,7 +13,6 @@ import {
     HiOutlineSortDescending,
     HiOutlineXCircle,
 } from 'react-icons/hi';
-import { runPipeline } from '../api';
 import { generateReportPDF } from '../utils/pdfExport';
 import './RunPipeline.css';
 
@@ -37,7 +37,7 @@ function getCategoryTag(category) {
     return 'capability';
 }
 
-/* ── Strategic Direction — keyword-enriched mapping ────────────── */
+/* ── Strategic Direction ────────────────────────────────────────── */
 function deriveStrategicDirections(features) {
     if (!features?.length) return [];
     const allText = features.map(f =>
@@ -59,32 +59,40 @@ function deriveStrategicDirections(features) {
         { keywords: ['cost', 'pricing', 'free tier', 'affordable'], label: 'Market Accessibility Push' },
     ];
 
-    const matched = RULES.filter(rule =>
+    return RULES.filter(rule =>
         rule.keywords.some(kw => allText.includes(kw))
-    ).map(r => r.label);
-
-    return matched.slice(0, 5); // Max 5
+    ).map(r => r.label).slice(0, 5);
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   MAIN PAGE — state now lives in PipelineContext, not here
+   ═══════════════════════════════════════════════════════════════════ */
 export default function RunPipeline() {
     const location = useLocation();
     const { settings } = useSettings();
-    const [company, setCompany] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [result, setResult] = useState(null);
-    const [error, setError] = useState('');
+
+    // ── Pull everything from the global context ──────────────────
+    const {
+        company, setCompany,
+        loading,
+        result,
+        error,
+        activeStage,
+        elapsed,
+        executePipeline,
+        stopPipeline,
+    } = usePipeline();
+
+    // ── Local-only UI state (fine to reset on navigation) ────────
     const [pdfLoading, setPdfLoading] = useState(false);
     const [sourcesExpanded, setSourcesExpanded] = useState(false);
-
-    // Filters
     const [filterCategory, setFilterCategory] = useState('all');
     const [filterConfidence, setFilterConfidence] = useState('all');
     const [sortBy, setSortBy] = useState('confidence');
-
-    // Expanded signal cards
     const [expandedSignals, setExpandedSignals] = useState(new Set());
+
+    // Prevent duplicate auto-runs when navigated here via location.state
     const lastAutoRunCompanyRef = useRef('');
-    const abortControllerRef = useRef(null);
 
     const toggleSignal = useCallback((idx) => {
         setExpandedSignals(prev => {
@@ -94,6 +102,8 @@ export default function RunPipeline() {
             return next;
         });
     }, []);
+
+    const report = result?.report || result;
 
     const handleDownloadPDF = async () => {
         if (!report) return;
@@ -106,63 +116,30 @@ export default function RunPipeline() {
         }
     };
 
-    const executePipeline = useCallback(async (companyName) => {
-        if (!companyName.trim()) return;
-        setLoading(true);
-        setError('');
-        setResult(null);
+    const handleRun = async (e) => {
+        e.preventDefault();
         setExpandedSignals(new Set());
         setFilterCategory('all');
         setFilterConfidence('all');
-        abortControllerRef.current = new AbortController();
-
-        try {
-            const data = await runPipeline(companyName.trim(), {
-                signal: abortControllerRef.current.signal,
-            });
-            setResult(data);
-        } catch (err) {
-            if (err.name === 'AbortError') {
-                setError('Pipeline stopped by user.');
-            } else {
-                setError(err.message || 'Pipeline execution failed');
-            }
-        } finally {
-            abortControllerRef.current = null;
-            setLoading(false);
-        }
-    }, []);
-
-    const handleRun = async (e) => {
-        e.preventDefault();
         await executePipeline(company);
     };
 
+    // Auto-run when navigated here from another page (e.g. Watchlist)
     useEffect(() => {
         const autoRunCompany = location.state?.autoRunCompany;
         if (!autoRunCompany || loading) return;
         if (lastAutoRunCompanyRef.current === autoRunCompany) return;
-
         lastAutoRunCompanyRef.current = autoRunCompany;
         setCompany(autoRunCompany);
         executePipeline(autoRunCompany);
-    }, [location.state, executePipeline, loading]);
+    }, [location.state, executePipeline, loading, setCompany]);
 
-    const handleStop = useCallback(() => {
-        if (!abortControllerRef.current) return;
-        abortControllerRef.current.abort();
-    }, []);
-
-    const report = result?.report || result;
-
-    // All unique categories
+    // ── Derived data ─────────────────────────────────────────────
     const allCategories = useMemo(() => {
         if (!report?.features?.length) return [];
-        const cats = [...new Set(report.features.map(f => f.category || 'General'))];
-        return cats.sort();
+        return [...new Set(report.features.map(f => f.category || 'General'))].sort();
     }, [report]);
 
-    // Distribution data — signal count per category
     const distribution = useMemo(() => {
         if (!report?.features?.length) return [];
         const counts = {};
@@ -180,12 +157,10 @@ export default function RunPipeline() {
             .sort((a, b) => b.count - a.count);
     }, [report]);
 
-    // Filtered + sorted signals
     const filteredSignals = useMemo(() => {
         if (!report?.features?.length) return [];
         let signals = [...report.features];
 
-        // Apply settings category filter — remove signals from disabled categories
         const enabledCategories = settings.analysis.defaultCategories;
         signals = signals.filter(f => {
             const cat = (f.category || '').toLowerCase();
@@ -193,22 +168,19 @@ export default function RunPipeline() {
             if (cat.includes('infra') || cat.includes('cloud')) return enabledCategories.infrastructure;
             if (cat.includes('security') || cat.includes('privacy')) return enabledCategories.security;
             if (cat.includes('developer') || cat.includes('api') || cat.includes('sdk')) return enabledCategories.developer;
-            return true; // allow uncategorized signals
+            return true;
         });
 
-        // Filter by category dropdown
         if (filterCategory !== 'all') {
             signals = signals.filter(f => (f.category || 'General') === filterCategory);
         }
 
-        // Apply settings confidence threshold
         const threshold = settings.analysis.confidenceThreshold / 100;
         signals = signals.filter(f => {
             const score = f.confidence_score ?? f.confidence ?? 0;
             return score >= threshold;
         });
 
-        // Filter by confidence dropdown
         if (filterConfidence !== 'all') {
             signals = signals.filter(f => {
                 const score = f.confidence_score ?? f.confidence ?? 0;
@@ -219,7 +191,6 @@ export default function RunPipeline() {
             });
         }
 
-        // Sort
         if (sortBy === 'confidence') {
             signals.sort((a, b) => (b.confidence_score ?? b.confidence ?? 0) - (a.confidence_score ?? a.confidence ?? 0));
         } else if (sortBy === 'category') {
@@ -229,7 +200,6 @@ export default function RunPipeline() {
         return signals;
     }, [report, filterCategory, filterConfidence, sortBy, settings.analysis]);
 
-    // Average confidence
     const avgConfidence = useMemo(() => {
         if (!report?.features?.length) return 0;
         const scores = report.features
@@ -238,7 +208,6 @@ export default function RunPipeline() {
         return scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
     }, [report]);
 
-    // Strategic directions
     const strategicDirections = useMemo(() =>
         deriveStrategicDirections(report?.features), [report]);
 
@@ -281,14 +250,13 @@ export default function RunPipeline() {
                         <button
                             type="button"
                             className="btn btn-danger btn-lg intel-stop-btn"
-                            onClick={handleStop}
+                            onClick={stopPipeline}
                         >
                             <HiOutlineXCircle /> Stop
                         </button>
                     )}
                 </div>
 
-                {/* Suggestion chips */}
                 <div className="intel-suggestions">
                     {SUGGESTIONS.map(s => (
                         <button
@@ -304,9 +272,13 @@ export default function RunPipeline() {
                 </div>
             </form>
 
-            {/* ── Loading State — Cinematic Pipeline Flow ─────── */}
+            {/* ── Pipeline Animation (reads from context — survives tab switch) ── */}
             {loading && (
-                <PipelineAnimation company={company} />
+                <PipelineAnimation
+                    company={company}
+                    activeStage={activeStage}
+                    elapsed={elapsed}
+                />
             )}
 
             {/* ── Error ──────────────────────────────────────── */}
@@ -324,7 +296,6 @@ export default function RunPipeline() {
             {result && report && (
                 <div className="results-section fade-in-up">
 
-                    {/* Report Header */}
                     <div className="card result-header-card">
                         <div className="result-header-row">
                             <div className="result-meta">
@@ -354,10 +325,8 @@ export default function RunPipeline() {
                         </div>
                     </div>
 
-                    {/* ── Executive Insight + Distribution (side by side) ── */}
                     {(report.executive_summary || distribution.length > 0) && (
                         <div className="insight-grid fade-in-up">
-                            {/* Left: Executive Insight */}
                             {report.executive_summary && (
                                 <div className="card card-accent executive-card">
                                     <div className="executive-label">Executive Insight</div>
@@ -378,7 +347,6 @@ export default function RunPipeline() {
                                             <span className="exec-stat-label">Avg Confidence</span>
                                         </div>
                                     </div>
-                                    {/* Strategic Directions */}
                                     {strategicDirections.length > 0 && (
                                         <div className="strategic-directions">
                                             <span className="strategic-label">Strategic Direction</span>
@@ -392,7 +360,6 @@ export default function RunPipeline() {
                                 </div>
                             )}
 
-                            {/* Right: Signal Distribution */}
                             {distribution.length > 0 && (
                                 <div className="card distribution-card">
                                     <div className="distribution-label">Signal Distribution</div>
@@ -410,8 +377,6 @@ export default function RunPipeline() {
                                             </div>
                                         ))}
                                     </div>
-
-                                    {/* Avg Confidence Bar */}
                                     <div className="dist-confidence">
                                         <div className="dist-conf-header">
                                             <span className="dist-conf-label">Avg Confidence</span>
@@ -431,7 +396,6 @@ export default function RunPipeline() {
                         </div>
                     )}
 
-                    {/* ── Filter Bar ──────────────────────────────── */}
                     {report.features?.length > 0 && (
                         <div className="filter-bar fade-in-up">
                             <div className="filter-controls">
@@ -448,7 +412,6 @@ export default function RunPipeline() {
                                         ))}
                                     </select>
                                 </div>
-
                                 <div className="filter-group">
                                     <select
                                         className="filter-select"
@@ -461,7 +424,6 @@ export default function RunPipeline() {
                                         <option value="low">Low (&lt;40%)</option>
                                     </select>
                                 </div>
-
                                 <div className="filter-group">
                                     <HiOutlineSortDescending className="filter-icon" />
                                     <select
@@ -474,14 +436,12 @@ export default function RunPipeline() {
                                     </select>
                                 </div>
                             </div>
-
                             <span className="filter-count">
                                 Showing {filteredSignals.length} of {report.features.length} signals
                             </span>
                         </div>
                     )}
 
-                    {/* ── Discovered Signals ──────────────────────── */}
                     {filteredSignals.length > 0 && (
                         <div className="signals-section">
                             <div className="signals-list stagger">
@@ -507,7 +467,6 @@ export default function RunPipeline() {
                         </div>
                     )}
 
-                    {/* Evidence Layer — Sources (Collapsible) */}
                     {settings.reports.includeSources && report.all_sources && report.all_sources.length > 0 && (
                         <div className="card evidence-section fade-in-up">
                             <button
@@ -520,7 +479,6 @@ export default function RunPipeline() {
                                 </span>
                                 {sourcesExpanded ? <HiOutlineChevronUp /> : <HiOutlineChevronDown />}
                             </button>
-
                             {sourcesExpanded && (
                                 <div className="evidence-list fade-in">
                                     {report.all_sources.map((url, i) => (
@@ -545,8 +503,7 @@ export default function RunPipeline() {
     );
 }
 
-/* ── Signal Card — Expandable ──────────────────────────────────── */
-
+/* ── Signal Card ────────────────────────────────────────────────── */
 function SignalCard({ signal: f, index, isExpanded, onToggle, detailLevel = 'detailed' }) {
     const score = f.confidence_score ?? f.confidence;
     const pct = score != null ? Math.round(score * 100) : null;
@@ -555,7 +512,6 @@ function SignalCard({ signal: f, index, isExpanded, onToggle, detailLevel = 'det
 
     return (
         <div className={`signal-card ${isExpanded ? 'expanded' : ''} fade-in-up`}>
-            {/* Collapsed header — always visible */}
             <div className="signal-header" onClick={onToggle}>
                 <div className="signal-rank">{f.rank || index + 1}</div>
                 <div className="signal-title-area">
@@ -578,25 +534,19 @@ function SignalCard({ signal: f, index, isExpanded, onToggle, detailLevel = 'det
                 </button>
             </div>
 
-            {/* Expanded content */}
             {isExpanded && (
                 <div className="signal-expanded fade-in">
-                    {/* Description */}
                     {(f.description || f.feature_summary) && (
                         <p className="signal-description">
                             {f.description || f.feature_summary}
                         </p>
                     )}
-
-                    {/* Impact Assessment — hidden in compact mode */}
                     {detailLevel === 'detailed' && f.impact_assessment && (
                         <div className="signal-impact">
                             <span className="impact-label">Impact</span>
                             <span className="impact-text">{f.impact_assessment}</span>
                         </div>
                     )}
-
-                    {/* Footer: metrics + source */}
                     <div className="signal-footer">
                         {detailLevel === 'detailed' && f.key_metrics && f.key_metrics.length > 0 && (
                             <div className="signal-metrics">
@@ -605,11 +555,9 @@ function SignalCard({ signal: f, index, isExpanded, onToggle, detailLevel = 'det
                                 ))}
                             </div>
                         )}
-
                         {f.source_count && (
                             <span className="signal-meta">{f.source_count} source{f.source_count > 1 ? 's' : ''}</span>
                         )}
-
                         {f.source_url && (
                             <a
                                 href={f.source_url}
@@ -627,27 +575,8 @@ function SignalCard({ signal: f, index, isExpanded, onToggle, detailLevel = 'det
     );
 }
 
-/* ── Cinematic Pipeline Animation ──────────────────────────────── */
-
-function PipelineAnimation({ company }) {
-    const [activeStage, setActiveStage] = useState(0);
-    const [elapsed, setElapsed] = useState(0);
-
-    useEffect(() => {
-        const stageTimer = setInterval(() => {
-            setActiveStage(prev => (prev < PIPELINE_STAGES.length - 1 ? prev + 1 : prev));
-        }, 5000);
-
-        const clockTimer = setInterval(() => {
-            setElapsed(prev => prev + 1);
-        }, 1000);
-
-        return () => {
-            clearInterval(stageTimer);
-            clearInterval(clockTimer);
-        };
-    }, []);
-
+/* ── Pipeline Animation — now receives stage/elapsed as props ───── */
+function PipelineAnimation({ company, activeStage, elapsed }) {
     const formatTime = (s) => {
         const m = Math.floor(s / 60);
         const sec = s % 60;
@@ -658,7 +587,6 @@ function PipelineAnimation({ company }) {
 
     return (
         <div className="card pipeline-anim-card fade-in">
-            {/* Header */}
             <div className="pipeline-anim-header">
                 <div>
                     <h3>Analyzing <strong>{company}</strong></h3>
@@ -672,7 +600,6 @@ function PipelineAnimation({ company }) {
                 </div>
             </div>
 
-            {/* Pipeline Flow */}
             <div className="pipeline-flow">
                 {PIPELINE_STAGES.map((stage, i) => {
                     const state = i < activeStage ? 'done' : i === activeStage ? 'active' : 'pending';
@@ -696,7 +623,6 @@ function PipelineAnimation({ company }) {
                 })}
             </div>
 
-            {/* Progress Bar */}
             <div className="pipeline-anim-bar">
                 <div className="pipeline-anim-bar-fill" style={{ width: `${progress}%` }} />
             </div>
