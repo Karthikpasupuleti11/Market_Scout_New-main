@@ -46,34 +46,40 @@ def load_store():
 
 def ask_question(query: str):
     store = load_store()
-
     if not store:
-        return {
-            "answer": "No document uploaded.",
-            "sources": []
-        }
+        return {"answer": "No document uploaded.", "sources": []}
+
+    # Detect broad/summary questions
+    broad_keywords = ["about", "summarize", "summary", "overview", "what is", 
+                      "company", "topic", "describe", "explain"]
+    is_broad = any(kw in query.lower() for kw in broad_keywords)
+    
+    k = 8 if is_broad else 4  # Fetch more chunks for broad questions
 
     query_embedding = embed([query])
-    chunks = store.search(query_embedding, k=4)
-
+    chunks = store.search(query_embedding, k=k)
     context = "\n\n".join([c["text"] for c in chunks])
 
     messages = [
-        {
-            "role": "system",
-            "content": "Answer ONLY from the context. If not found, say 'Not in report'."
-        },
-        {
-            "role": "user",
-            "content": f"""
-Context:
+    {
+        "role": "system",
+        "content": """You are a helpful document assistant. You are given excerpts from a report.
+Answer the user's question using the provided context as your primary source.
+- If the answer is directly in the context, answer clearly and concisely.
+- If the question is broad (like 'summarize' or 'what is this about'), synthesize from the context chunks available.
+- If the context genuinely has no relevant information, say 'The uploaded report does not contain information about this.'
+Never say 'Not in report' for general questions that can be reasonably answered from context."""
+    },
+    {
+        "role": "user",
+        "content": f"""Context from the document:
 {context}
 
-Question:
-{query}
-"""
-        }
-    ]
+User question: {query}
+
+Please answer based on the above context."""
+    }
+]
 
     try:
         response = invoke_llm(messages)
