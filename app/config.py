@@ -88,12 +88,22 @@ class Settings(BaseSettings):
     DATE_WINDOW_DAYS: int = 7           # Only features ≤ 7 days old
     MAX_RETRIES: int = 3                # Retry count for transient failures
 
-    # ── Email / SMTP (Gmail) ───────────────────────────────────────
-    SMTP_HOST:     str = os.getenv("SMTP_HOST",     "smtp.gmail.com")
-    SMTP_PORT:     int = int(os.getenv("SMTP_PORT", "587"))
-    SMTP_USER:     str = os.getenv("SMTP_USER",     "")
-    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
-    SMTP_FROM:     str = os.getenv("SMTP_FROM",     "")
+   # ── Gmail API Configuration ────────────────────────────────────
+
+    EMAIL_SENDER: str = os.getenv(
+        "EMAIL_SENDER",
+        ""
+    )
+
+    GOOGLE_CREDENTIALS_PATH: str = os.getenv(
+        "GOOGLE_CREDENTIALS_PATH",
+        "credentials/credentials.json"
+    )
+
+    GOOGLE_TOKEN_PATH: str = os.getenv(
+        "GOOGLE_TOKEN_PATH",
+        "credentials/token.json"
+    )
 
 
 settings = Settings()

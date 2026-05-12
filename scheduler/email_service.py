@@ -4,16 +4,9 @@ Market Intelligence Scout — Email Service
 Sends an HTML email with inline report content + a PDF attachment
 via Gmail SMTP (TLS on port 587).
 """
-
-import smtplib
+from mcp_server.tools.gmail_tool import send_market_report
 import logging
-from email.mime.multipart import MIMEMultipart
-from email.mime.text     import MIMEText
-from email.mime.base     import MIMEBase
-from email               import encoders
 from datetime            import datetime, timezone
-
-from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -339,42 +332,32 @@ def send_report_email(report: dict, company: str, recipient_email: str) -> None:
 
     Raises on SMTP failure.
     """
-    if not all([settings.SMTP_USER, settings.SMTP_PASSWORD]):
-        raise RuntimeError(
-            "SMTP_USER and SMTP_PASSWORD must be set in .env to send emails."
-        )
+    
 
     subject = f"📊 Market Intelligence Report — {company}"
 
-    msg = MIMEMultipart("mixed")
-    msg["Subject"] = subject
-    msg["From"]    = settings.SMTP_FROM or settings.SMTP_USER
-    msg["To"]      = recipient_email
-
     # HTML body
     html_body = _build_html(report, company)
-    msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+    pdf_bytes = None
 
     # PDF attachment
     try:
         pdf_bytes = _build_pdf(report, company)
-        safe_name = company.replace(" ", "_").lower()
-        part = MIMEBase("application", "octet-stream")
-        part.set_payload(pdf_bytes)
-        encoders.encode_base64(part)
-        part.add_header(
-            "Content-Disposition",
-            f'attachment; filename="market_intelligence_{safe_name}.pdf"',
-        )
-        msg.attach(part)
     except Exception as pdf_err:
         logger.warning("EMAIL — PDF generation failed (sending HTML only): %s", pdf_err)
 
-    # Send via Gmail SMTP TLS
-    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-        server.ehlo()
-        server.starttls()
-        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-        server.sendmail(settings.SMTP_USER, recipient_email, msg.as_string())
+    # Send using Gmail API + MCP
 
-    logger.info("EMAIL — Report sent to %s for company '%s'", recipient_email, company)
+    send_market_report(
+        recipient=recipient_email,
+        company=company,
+        html_body=html_body,
+        pdf_bytes=pdf_bytes
+    )
+
+    logger.info(
+        "EMAIL — Report sent to %s for company '%s'",
+        recipient_email,
+        company
+    )
