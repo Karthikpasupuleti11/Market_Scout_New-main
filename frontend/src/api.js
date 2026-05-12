@@ -1,4 +1,4 @@
-const API_BASE = 'http://127.0.0.1:8000';
+const API_BASE = 'https://api.market-scout.me';
 
 export async function runPipeline(companyName, options = {}) {
     const res = await fetch(`${API_BASE}/run-agent`, {
