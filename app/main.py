@@ -135,8 +135,11 @@ async def lifespan(app: FastAPI):
     app.state.graph = build_graph()
     logger.info("LangGraph pipeline compiled and ready")
 
-    # Start the APScheduler
-    scheduler.init_scheduler()
+    # Start the APScheduler (only one process should own it)
+    if settings.ENABLE_SCHEDULER:
+        scheduler.init_scheduler()
+    else:
+        logger.info("Scheduler disabled in this process (ENABLE_SCHEDULER=False)")
 
     # Initialise tracing (optional — only if OpenTelemetry deps are present)
     try:
@@ -148,7 +151,8 @@ async def lifespan(app: FastAPI):
     yield
     
     logger.info("Shutting down %s", settings.APP_NAME)
-    scheduler.shutdown_scheduler()
+    if settings.ENABLE_SCHEDULER:
+        scheduler.shutdown_scheduler()
 
 
 # ────────────────────────────────────────────────────────────────────
@@ -277,6 +281,18 @@ def health_check():
 )
 async def run_agent(request: AgentRequest):
     """Execute the full intelligence pipeline for a given company."""
+    # Global concurrency cap — prevents thundering herd against LLM rate limit.
+    from cache.redis_client import check_rate_limit
+    if not check_rate_limit(
+        "pipeline_global",
+        limit=settings.LLM_GLOBAL_PIPELINE_LIMIT,
+        window_seconds=120,
+    ):
+        raise HTTPException(
+            status_code=429,
+            detail=f"Pipeline capacity reached (max {settings.LLM_GLOBAL_PIPELINE_LIMIT} concurrent). Retry in ~2 min.",
+        )
+
     logger.info("API — Pipeline invoked for: '%s'", request.company_name)
     ACTIVE_PIPELINES.inc()
 

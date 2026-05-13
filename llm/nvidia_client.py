@@ -1,46 +1,93 @@
 """
 Market Intelligence Scout — LLM Client (NVIDIA NIM)
 
-Enterprise-grade wrapper around the NVIDIA API with:
-  • Retry logic (exponential back-off)
-  • Structured logging
-  • Token budget enforcement
-  • Single client instance (connection reuse)
-  • Prometheus metrics (latency, token usage, call counts)
+Multi-key pool with per-key token-bucket rate limit, prompt-level cache
+for deterministic (temperature=0) calls, retry with exponential back-off.
 """
 
+import hashlib
+import json
 import logging
+import threading
 import time
+from collections import deque
+from itertools import cycle
 from typing import List, Dict, Optional
 
 from openai import OpenAI
+
 from app.config import settings
+from cache.redis_client import make_cache_key, get_cache, set_cache
 from observability.metrics import LLM_CALL_COUNT, LLM_LATENCY, LLM_TOKEN_USAGE
 
 logger = logging.getLogger(__name__)
 
+
 # ────────────────────────────────────────────────────────────────────
-# Singleton Client
+# Token Bucket — per key, sliding 60s window
 # ────────────────────────────────────────────────────────────────────
 
-_client: Optional[OpenAI] = None
+class TokenBucket:
+    def __init__(self, rpm: int):
+        self.rpm = rpm
+        self.window = 60.0
+        self.calls: deque = deque()
+        self.cond = threading.Condition(threading.Lock())
+
+    def acquire(self) -> None:
+        with self.cond:
+            while True:
+                now = time.monotonic()
+                while self.calls and now - self.calls[0] > self.window:
+                    self.calls.popleft()
+                if len(self.calls) < self.rpm:
+                    self.calls.append(now)
+                    return
+                wait = self.window - (now - self.calls[0]) + 0.01
+                self.cond.wait(timeout=max(0.05, wait))
 
 
-def _get_client() -> OpenAI:
-    """Lazy-initialise a single OpenAI-compatible client for NVIDIA NIM."""
-    global _client
-    if _client is None:
-        if not settings.NVIDIA_API_KEY:
-            raise RuntimeError("NVIDIA_API_KEY is not configured.")
-        _client = OpenAI(
-            base_url="https://integrate.api.nvidia.com/v1",
-            api_key=settings.NVIDIA_API_KEY,
-        )
-    return _client
+# ────────────────────────────────────────────────────────────────────
+# Key Pool
+# ────────────────────────────────────────────────────────────────────
 
+def _load_keys() -> List[str]:
+    raw = settings.NVIDIA_API_KEYS or settings.NVIDIA_API_KEY
+    keys = [k.strip() for k in raw.split(",") if k.strip()]
+    if not keys:
+        raise RuntimeError("No NVIDIA API keys configured.")
+    return keys
+
+
+_keys = _load_keys()
+_clients: Dict[str, OpenAI] = {}
+_buckets: Dict[str, TokenBucket] = {k: TokenBucket(settings.LLM_RPM_PER_KEY) for k in _keys}
+_cycle_lock = threading.Lock()
+_cycle = cycle(_keys)
+
+logger.info("LLM — key pool size=%d rpm_per_key=%d total_rpm=%d",
+            len(_keys), settings.LLM_RPM_PER_KEY,
+            len(_keys) * settings.LLM_RPM_PER_KEY)
+
+
+def _next_key() -> str:
+    with _cycle_lock:
+        return next(_cycle)
+
+
+def _client_for(key: str) -> OpenAI:
+    c = _clients.get(key)
+    if c is None:
+        c = OpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=key)
+        _clients[key] = c
+    return c
+
+
+# ────────────────────────────────────────────────────────────────────
+# Helpers
+# ────────────────────────────────────────────────────────────────────
 
 def _infer_agent_name(messages: List[Dict[str, str]]) -> str:
-    """Best-effort inference of calling agent from system prompt content."""
     if not messages:
         return "unknown"
     system_msg = messages[0].get("content", "").lower() if messages else ""
@@ -61,6 +108,17 @@ def _infer_agent_name(messages: List[Dict[str, str]]) -> str:
     return "unknown"
 
 
+def _prompt_cache_key(messages, temperature, max_tokens) -> str:
+    payload = json.dumps({
+        "m": messages,
+        "t": temperature,
+        "k": max_tokens,
+        "model": settings.LLM_MODEL,
+    }, sort_keys=True, default=str)
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:24]
+    return make_cache_key("llm", digest)
+
+
 # ────────────────────────────────────────────────────────────────────
 # Core LLM Invocation
 # ────────────────────────────────────────────────────────────────────
@@ -71,24 +129,26 @@ def invoke_llm(
     max_tokens: int = settings.LLM_MAX_TOKENS,
     retries: int = settings.MAX_RETRIES,
 ) -> str:
-    """Call the NVIDIA LLM with automatic retry on transient failures.
-
-    Parameters
-    ----------
-    messages : list of {"role": ..., "content": ...}
-    temperature : sampling temperature
-    max_tokens : hard cap on response tokens
-    retries : number of retry attempts
-
-    Returns
-    -------
-    str — raw text response from the model
-    """
-    client = _get_client()
-    last_error: Optional[Exception] = None
     agent_name = _infer_agent_name(messages)
 
+    # ── Prompt-level cache (deterministic calls only) ─────────────
+    cache_key: Optional[str] = None
+    if temperature == 0:
+        cache_key = _prompt_cache_key(messages, temperature, max_tokens)
+        cached = get_cache(cache_key)
+        if cached is not None:
+            LLM_CALL_COUNT.labels(agent_name=agent_name, status="cache_hit").inc()
+            logger.debug("LLM CACHE HIT agent=%s", agent_name)
+            return cached
+
+    last_error: Optional[Exception] = None
+
     for attempt in range(1, retries + 1):
+        # Pick a key, wait for its bucket
+        key = _next_key()
+        _buckets[key].acquire()
+        client = _client_for(key)
+
         start_time = time.time()
         try:
             response = client.chat.completions.create(
@@ -101,7 +161,6 @@ def invoke_llm(
             duration = time.time() - start_time
             content = response.choices[0].message.content
 
-            # ── Record Prometheus metrics ──────────────────────────
             LLM_CALL_COUNT.labels(agent_name=agent_name, status="success").inc()
             LLM_LATENCY.labels(agent_name=agent_name).observe(duration)
             if response.usage:
@@ -112,9 +171,12 @@ def invoke_llm(
                     agent_name=agent_name, token_type="completion"
                 ).inc(response.usage.completion_tokens)
 
+            if cache_key and content:
+                set_cache(cache_key, content, expire=settings.LLM_PROMPT_CACHE_TTL)
+
             logger.debug(
-                "LLM OK  model=%s tokens=%s attempt=%d duration=%.2fs",
-                settings.LLM_MODEL,
+                "LLM OK key=...%s tokens=%s attempt=%d duration=%.2fs",
+                key[-6:],
                 response.usage.total_tokens if response.usage else "?",
                 attempt,
                 duration,
@@ -127,19 +189,19 @@ def invoke_llm(
             LLM_CALL_COUNT.labels(agent_name=agent_name, status="retry").inc()
             LLM_LATENCY.labels(agent_name=agent_name).observe(duration)
 
-            wait = 2 ** attempt  # 2s, 4s, 8s
+            wait = 2 ** attempt
             logger.warning(
-                "LLM FAIL attempt=%d/%d error=%s — retrying in %ds",
-                attempt, retries, exc, wait,
+                "LLM FAIL attempt=%d/%d key=...%s error=%s — retrying in %ds",
+                attempt, retries, key[-6:], exc, wait,
             )
             if attempt < retries:
                 time.sleep(wait)
 
-    # Exhausted retries
     LLM_CALL_COUNT.labels(agent_name=agent_name, status="failure").inc()
     raise RuntimeError(
         f"LLM invocation failed after {retries} attempts: {last_error}"
     ) from last_error
+
 
 # ────────────────────────────────────────────────────────────────────
 # Tool-Calling LLM Invocation (For Agentic Execution)
@@ -152,12 +214,14 @@ def invoke_llm_with_tools(
     max_tokens: int = settings.LLM_MAX_TOKENS,
 ):
     """
-    Call NVIDIA LLM with OpenAI-style function/tool calling enabled.
-    Returns full response object (NOT just content).
+    Tool-calling variant. Same key pool + bucket, no prompt cache (tool calls
+    are typically non-deterministic).
     """
-    client = _get_client()
+    key = _next_key()
+    _buckets[key].acquire()
+    client = _client_for(key)
 
-    response = client.chat.completions.create(
+    return client.chat.completions.create(
         model=settings.LLM_MODEL,
         messages=messages,
         tools=tools,
@@ -166,5 +230,3 @@ def invoke_llm_with_tools(
         max_tokens=max_tokens,
         top_p=settings.LLM_TOP_P,
     )
-
-    return response

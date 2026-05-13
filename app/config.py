@@ -20,10 +20,16 @@ class Settings(BaseSettings):
 
     # ── NVIDIA LLM ─────────────────────────────────────────────────
     NVIDIA_API_KEY: str = os.getenv("NVIDIA_API_KEY", "")
+    # Comma-separated pool. Falls back to NVIDIA_API_KEY if empty.
+    NVIDIA_API_KEYS: str = os.getenv("NVIDIA_API_KEYS", "")
     LLM_MODEL: str = "meta/llama-3.1-8b-instruct"
     LLM_MAX_TOKENS: int = 4096
     LLM_TEMPERATURE: float = 0.2
     LLM_TOP_P: float = 0.7
+    # Rate limits
+    LLM_RPM_PER_KEY: int = int(os.getenv("LLM_RPM_PER_KEY", "40"))
+    LLM_GLOBAL_PIPELINE_LIMIT: int = int(os.getenv("LLM_GLOBAL_PIPELINE_LIMIT", "3"))
+    LLM_PROMPT_CACHE_TTL: int = int(os.getenv("LLM_PROMPT_CACHE_TTL", "86400"))
 
     # ── Search ─────────────────────────────────────────────────────
     TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
@@ -87,6 +93,10 @@ class Settings(BaseSettings):
     # ── Pipeline ───────────────────────────────────────────────────
     DATE_WINDOW_DAYS: int = 7           # Only features ≤ 7 days old
     MAX_RETRIES: int = 3                # Retry count for transient failures
+
+    # ── Process Topology ───────────────────────────────────────────
+    # Set false on multi-worker API replicas; only one process should run scheduler.
+    ENABLE_SCHEDULER: bool = os.getenv("ENABLE_SCHEDULER", "True") == "True"
 
    # ── Gmail API Configuration ────────────────────────────────────
 
