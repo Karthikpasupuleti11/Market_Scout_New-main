@@ -16,6 +16,7 @@ Redis caching:
 import json
 import re
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, Any, List
 
 from graph.state import GraphState
@@ -23,6 +24,8 @@ from llm.nvidia_client import invoke_llm
 from cache.redis_client import make_cache_key, get_cache, set_cache
 
 logger = logging.getLogger(__name__)
+
+MAX_PARALLEL = 10
 
 
 # ────────────────────────────────────────────────────────────────────
@@ -70,34 +73,43 @@ def feature_extraction_node(state: GraphState) -> Dict[str, Any]:
         return {"extracted_features": []}
 
     all_features: List[Dict[str, Any]] = []
+    with ThreadPoolExecutor(max_workers=min(MAX_PARALLEL, len(filtered))) as pool:
+        futures = [pool.submit(_extract_one, art, company_name) for art in filtered]
+        for fut in as_completed(futures):
+            all_features.extend(fut.result() or [])
 
-    for article in filtered:
-        url = article.get("url", "")
+    logger.info(
+        "FEATURE EXTRACTION — Total features extracted: %d",
+        len(all_features),
+    )
 
-        # ── Cache check ────────────────────────────────────────────
-        cache_key = make_cache_key("features", url)
-        cached = get_cache(cache_key)
-        if cached:
-            logger.debug("FEATURE EXTRACTION — Cache hit for: %s", url[:60])
-            all_features.extend(cached)
-            continue
+    return {"extracted_features": all_features}
 
-        # ── LLM extraction ─────────────────────────────────────────
-        article_text = article.get("article_text", "")[:8000]
 
-        system_message = {
-            "role": "system",
-            "content": (
-                "You are a precise extraction engine for technical product updates. "
-                "Use ONLY the text provided in DATA. "
-                "If a feature, model, parameter, or metric is not EXPLICITLY mentioned in DATA, "
-                "do NOT infer, assume, or invent it. "
-                "If there are no explicit technical changes in DATA, return an empty JSON list []. "
-                "NEVER fabricate feature names, version numbers, or performance metrics."
-            ),
-        }
+def _extract_one(article: Dict[str, Any], company_name: str) -> List[Dict[str, Any]]:
+    url = article.get("url", "")
 
-        user_prompt = f"""Analyse the following technical update for {company_name}.
+    cache_key = make_cache_key("features", url)
+    cached = get_cache(cache_key)
+    if cached:
+        logger.debug("FEATURE EXTRACTION — Cache hit for: %s", url[:60])
+        return cached
+
+    article_text = article.get("article_text", "")[:8000]
+
+    system_message = {
+        "role": "system",
+        "content": (
+            "You are a precise extraction engine for technical product updates. "
+            "Use ONLY the text provided in DATA. "
+            "If a feature, model, parameter, or metric is not EXPLICITLY mentioned in DATA, "
+            "do NOT infer, assume, or invent it. "
+            "If there are no explicit technical changes in DATA, return an empty JSON list []. "
+            "NEVER fabricate feature names, version numbers, or performance metrics."
+        ),
+    }
+
+    user_prompt = f"""Analyse the following technical update for {company_name}.
 
 TASK: Extract ONLY specific, verifiable technical changes. For each feature, provide:
   - A concise title (max 10 words)
@@ -128,53 +140,40 @@ CONSTRAINTS:
 
 Return ONLY the JSON list. No preamble, no explanation."""
 
-        try:
-            response = invoke_llm(
-                [system_message, {"role": "user", "content": user_prompt}],
-                temperature=0.0,
-                max_tokens=settings_max_tokens(),
-            )
+    try:
+        response = invoke_llm(
+            [system_message, {"role": "user", "content": user_prompt}],
+            temperature=0.0,
+            max_tokens=settings_max_tokens(),
+        )
 
-            cleaned = _clean_json_response(response)
-            features = json.loads(cleaned)
+        cleaned = _clean_json_response(response)
+        features = json.loads(cleaned)
 
-            if not isinstance(features, list):
-                features = []
+        if not isinstance(features, list):
+            features = []
 
-            # Enrich with provenance
-            article_features = []
-            for f in features:  # No per-article cap
-                f["source_authority"] = article.get("authority_score", 0.5)
-                f["url"] = url
-                f["publish_date"] = article.get("publish_date")
-                article_features.append(f)
+        article_features = []
+        for f in features:
+            f["source_authority"] = article.get("authority_score", 0.5)
+            f["url"] = url
+            f["publish_date"] = article.get("publish_date")
+            article_features.append(f)
 
-            # Cache
-            set_cache(cache_key, article_features)
-            all_features.extend(article_features)
+        set_cache(cache_key, article_features)
 
-            logger.debug(
-                "FEATURE EXTRACTION — Extracted %d features from: %s",
-                len(article_features), url[:60],
-            )
+        logger.debug(
+            "FEATURE EXTRACTION — Extracted %d features from: %s",
+            len(article_features), url[:60],
+        )
+        return article_features
 
-        except json.JSONDecodeError as exc:
-            logger.warning(
-                "FEATURE EXTRACTION — JSON parse error for %s: %s",
-                url[:60], exc,
-            )
-        except Exception as exc:
-            logger.warning(
-                "FEATURE EXTRACTION — Error for %s: %s",
-                url[:60], exc,
-            )
-
-    logger.info(
-        "FEATURE EXTRACTION — Total features extracted: %d",
-        len(all_features),
-    )
-
-    return {"extracted_features": all_features}
+    except json.JSONDecodeError as exc:
+        logger.warning("FEATURE EXTRACTION — JSON parse error for %s: %s", url[:60], exc)
+        return []
+    except Exception as exc:
+        logger.warning("FEATURE EXTRACTION — Error for %s: %s", url[:60], exc)
+        return []
 
 
 def settings_max_tokens() -> int:

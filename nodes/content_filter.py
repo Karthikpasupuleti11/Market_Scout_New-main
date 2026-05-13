@@ -1,45 +1,28 @@
 """
 Market Intelligence Scout — Content Filter Node
 
-Deterministic node with LLM-based semantic gating.
-
-Responsibilities:
-  • Classify articles as TECHNICAL or REJECT
-  • Filter out: stock analysis, HR news, opinions, general news
-  • Only pass through genuine technical feature updates
+Parallelized LLM classification across articles.
 """
 
 import logging
-from typing import Dict, Any, List
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Dict, Any, List, Tuple
 
 from graph.state import GraphState
 from llm.nvidia_client import invoke_llm
 
 logger = logging.getLogger(__name__)
 
+MAX_PARALLEL = 10
 
-def content_filter_node(state: GraphState) -> Dict[str, Any]:
-    """
-    Content Filter — semantic classification of article intent.
 
-    Input:  state["filtered_results"] (from Date Validation)
-    Output: state["filtered_results"] (overwritten with validated articles)
-    """
-    articles = state.get("filtered_results", [])
-    logger.info("CONTENT FILTER — Evaluating %d articles", len(articles))
+def _classify_one(article: Dict[str, Any]) -> Tuple[Dict[str, Any], bool]:
+    """Return (article, accepted)."""
+    title = article.get("title", "N/A")
+    text_snippet = article.get("article_text", "")[:600]
+    url = article.get("url", "")
 
-    if not articles:
-        logger.warning("CONTENT FILTER — No articles to filter")
-        return {"filtered_results": []}
-
-    validated: List[Dict[str, Any]] = []
-
-    for article in articles:
-        title = article.get("title", "N/A")
-        text_snippet = article.get("article_text", "")[:600]
-        url = article.get("url", "")
-
-        prompt = f"""You are an enterprise content classifier for a Market Intelligence system.
+    prompt = f"""You are an enterprise content classifier for a Market Intelligence system.
 
 Classify this article's primary intent:
 
@@ -64,35 +47,42 @@ Content excerpt:
 
 Respond with ONLY one word: ACCEPT or REJECT"""
 
-        messages = [
-            {
-                "role": "system",
-                "content": "You are a strict binary classifier. Respond with exactly one word.",
-            },
-            {"role": "user", "content": prompt},
-        ]
+    messages = [
+        {
+            "role": "system",
+            "content": "You are a strict binary classifier. Respond with exactly one word.",
+        },
+        {"role": "user", "content": prompt},
+    ]
 
-        try:
-            response = invoke_llm(messages, temperature=0.0, max_tokens=10)
-            decision = response.strip().upper()
+    try:
+        response = invoke_llm(messages, temperature=0.0, max_tokens=10)
+        decision = response.strip().upper()
+        accepted = "ACCEPT" in decision
+        logger.debug("CONTENT FILTER — %s: %s", "ACCEPT" if accepted else "REJECT", title[:60])
+        return article, accepted
+    except Exception as exc:
+        logger.warning(
+            "CONTENT FILTER — LLM error for '%s': %s — defaulting to ACCEPT",
+            title[:40], exc,
+        )
+        return article, True
 
-            if "ACCEPT" in decision:
+
+def content_filter_node(state: GraphState) -> Dict[str, Any]:
+    articles = state.get("filtered_results", [])
+    logger.info("CONTENT FILTER — Evaluating %d articles", len(articles))
+
+    if not articles:
+        return {"filtered_results": []}
+
+    validated: List[Dict[str, Any]] = []
+    with ThreadPoolExecutor(max_workers=min(MAX_PARALLEL, len(articles))) as pool:
+        futures = [pool.submit(_classify_one, art) for art in articles]
+        for fut in as_completed(futures):
+            article, accepted = fut.result()
+            if accepted:
                 validated.append(article)
-                logger.debug("CONTENT FILTER — ACCEPT: %s", title[:60])
-            else:
-                logger.debug("CONTENT FILTER — REJECT: %s", title[:60])
 
-        except Exception as exc:
-            # On LLM failure, conservatively include the article
-            logger.warning(
-                "CONTENT FILTER — LLM error for '%s': %s — defaulting to ACCEPT",
-                title[:40], exc,
-            )
-            validated.append(article)
-
-    logger.info(
-        "CONTENT FILTER — %d/%d articles passed",
-        len(validated), len(articles),
-    )
-
+    logger.info("CONTENT FILTER — %d/%d articles passed", len(validated), len(articles))
     return {"filtered_results": validated}

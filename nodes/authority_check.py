@@ -1,15 +1,11 @@
 """
 Market Intelligence Scout — Authority Check Node
 
-Deterministic node with LLM classification.
-
-Responsibilities:
-  • Verify if an article is an official or primary source
-  • Filter out secondary news coverage and aggregated reports
-  • Carry forward authority metadata
+Parallelized LLM source-credibility classification.
 """
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, Any, List
 
 from graph.state import GraphState
@@ -17,28 +13,14 @@ from llm.nvidia_client import invoke_llm
 
 logger = logging.getLogger(__name__)
 
+MAX_PARALLEL = 10
 
-def authority_check_node(state: GraphState) -> Dict[str, Any]:
-    """
-    Authority Check — classify article source credibility.
 
-    Input:  state["filtered_results"] (from Content Filter)
-    Output: state["filtered_results"] (overwritten with validated articles)
-    """
-    articles = state.get("filtered_results", [])
-    company_name = state.get("company_name", "")
-    logger.info("AUTHORITY CHECK — Evaluating %d articles for '%s'", len(articles), company_name)
+def _classify_one(article: Dict[str, Any], company_name: str) -> Dict[str, Any]:
+    title = article.get("title", "N/A")
+    url = article.get("url", "")
 
-    if not articles:
-        return {"filtered_results": []}
-
-    validated: List[Dict[str, Any]] = []
-
-    for article in articles:
-        title = article.get("title", "N/A")
-        url = article.get("url", "")
-
-        prompt = f"""You are an enterprise source-credibility classifier.
+    prompt = f"""You are an enterprise source-credibility classifier.
 
 Determine if this article is an OFFICIAL or PRIMARY technical source for {company_name}.
 
@@ -58,28 +40,42 @@ URL: {url}
 
 Respond with ONLY one word: PRIMARY or SECONDARY"""
 
-        messages = [
-            {"role": "system", "content": "You are a strict source classifier. Respond with one word."},
-            {"role": "user", "content": prompt},
-        ]
+    messages = [
+        {"role": "system", "content": "You are a strict source classifier. Respond with one word."},
+        {"role": "user", "content": prompt},
+    ]
 
-        try:
-            response = invoke_llm(messages, temperature=0.0, max_tokens=10)
-            decision = response.strip().upper()
+    try:
+        response = invoke_llm(messages, temperature=0.0, max_tokens=10)
+        decision = response.strip().upper()
 
-            if "PRIMARY" in decision:
-                validated.append(article)
-                logger.debug("AUTHORITY — PRIMARY: %s", url[:60])
-            else:
-                # Still include secondary sources but with reduced authority
-                article_copy = dict(article)
-                article_copy["authority_score"] = article_copy.get("authority_score", 0.5) * 0.7
-                validated.append(article_copy)
-                logger.debug("AUTHORITY — SECONDARY (reduced score): %s", url[:60])
+        if "PRIMARY" in decision:
+            logger.debug("AUTHORITY — PRIMARY: %s", url[:60])
+            return article
 
-        except Exception as exc:
-            logger.warning("AUTHORITY — LLM error for '%s': %s — defaulting to include", url[:40], exc)
-            validated.append(article)
+        article_copy = dict(article)
+        article_copy["authority_score"] = article_copy.get("authority_score", 0.5) * 0.7
+        logger.debug("AUTHORITY — SECONDARY (reduced score): %s", url[:60])
+        return article_copy
+
+    except Exception as exc:
+        logger.warning("AUTHORITY — LLM error for '%s': %s — defaulting to include", url[:40], exc)
+        return article
+
+
+def authority_check_node(state: GraphState) -> Dict[str, Any]:
+    articles = state.get("filtered_results", [])
+    company_name = state.get("company_name", "")
+    logger.info("AUTHORITY CHECK — Evaluating %d articles for '%s'", len(articles), company_name)
+
+    if not articles:
+        return {"filtered_results": []}
+
+    validated: List[Dict[str, Any]] = []
+    with ThreadPoolExecutor(max_workers=min(MAX_PARALLEL, len(articles))) as pool:
+        futures = [pool.submit(_classify_one, art, company_name) for art in articles]
+        for fut in as_completed(futures):
+            validated.append(fut.result())
 
     logger.info("AUTHORITY CHECK — %d articles passed", len(validated))
     return {"filtered_results": validated}

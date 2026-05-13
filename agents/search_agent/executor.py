@@ -1,4 +1,5 @@
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Set
 from tavily import TavilyClient
 from urllib.parse import urlparse
@@ -48,6 +49,19 @@ def is_valid_result(url: str) -> bool:
     return True
 
 
+def _run_query(query: str) -> tuple[str, List[Dict]]:
+    try:
+        response = _client.search(
+            query=query,
+            search_depth=settings.SEARCH_DEPTH,
+            max_results=settings.SEARCH_MAX_RESULTS,
+        )
+        return query, response.get("results", [])
+    except Exception as exc:
+        logger.error("EXECUTOR — Tavily API error for query '%s': %s", query, exc)
+        return query, []
+
+
 def execute_queries(
     queries: List[str],
     seen_urls: Set[str],
@@ -55,18 +69,13 @@ def execute_queries(
 
     all_results: List[Dict] = []
 
-    for query in queries:
-        try:
-            response = _client.search(
-                query=query,
-                search_depth=settings.SEARCH_DEPTH,
-                max_results=settings.SEARCH_MAX_RESULTS,
-            )
-        except Exception as exc:
-            logger.error("EXECUTOR — Tavily API error for query '%s': %s", query, exc)
-            continue
+    # Parallel Tavily queries
+    workers = min(len(queries), 6) if queries else 1
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(_run_query, q) for q in queries]
+        responses = [f.result() for f in as_completed(futures)]
 
-        raw_items = response.get("results", [])
+    for query, raw_items in responses:
         logger.debug(
             "EXECUTOR — Query '%s' returned %d raw results from Tavily",
             query, len(raw_items),
@@ -74,23 +83,18 @@ def execute_queries(
 
         accepted = 0
         for item in raw_items:
-
             url = item.get("url")
-
             if not url:
                 continue
-
             if url in seen_urls:
                 logger.debug("EXECUTOR — Skipping seen URL: %s", url)
                 continue
-
             if not is_valid_result(url):
                 logger.debug("EXECUTOR — Filtered out low-value URL: %s", url)
                 continue
 
             seen_urls.add(url)
             accepted += 1
-
             all_results.append({
                 "url": url,
                 "title": item.get("title", ""),
@@ -103,5 +107,4 @@ def execute_queries(
         )
 
     logger.info("EXECUTOR — Total results collected: %d (cap=%d)", len(all_results), MAX_RESULTS_RETURNED)
-    # 🔥 LIMIT RESULTS
     return all_results[:MAX_RESULTS_RETURNED]
