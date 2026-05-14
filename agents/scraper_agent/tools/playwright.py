@@ -1,66 +1,28 @@
 """
-Playwright scraper with shared persistent browser.
+Playwright scraper.
 
-Launches Chromium once per process, reuses for all URLs.
-Each scrape opens a fresh page (isolated cookies/storage).
+NOTE: a fresh sync_playwright() context is created per call on purpose.
+The scraper agent invokes scrape() from a ThreadPoolExecutor, and the
+Playwright sync API is not thread-safe — a shared browser cannot be driven
+from multiple threads. Per-call context is thread-safe and leak-free
+(the context manager stops the node driver on exit).
 """
 
-import atexit
-import logging
-import threading
-
-from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
-
+from bs4 import BeautifulSoup
 from .cleaners import clean_soup
 from .dates import from_meta, from_text
 
-logger = logging.getLogger(__name__)
-
-_lock = threading.Lock()
-_pw = None
-_browser = None
-
-
-def _get_browser():
-    """Lazy-launch Chromium once per process. Thread-safe."""
-    global _pw, _browser
-    if _browser is not None:
-        return _browser
-    with _lock:
-        if _browser is None:
-            _pw = sync_playwright().start()
-            _browser = _pw.chromium.launch(headless=True)
-            logger.info("PLAYWRIGHT — Chromium launched (shared instance)")
-    return _browser
-
-
-def _shutdown():
-    global _pw, _browser
-    try:
-        if _browser is not None:
-            _browser.close()
-        if _pw is not None:
-            _pw.stop()
-    except Exception:
-        pass
-    _browser = None
-    _pw = None
-
-
-atexit.register(_shutdown)
-
 
 def scrape(url: str):
-    browser = _get_browser()
-    context = browser.new_context()
-    page = context.new_page()
-    try:
-        page.goto(url, timeout=15000)
-        html = page.content()
-    finally:
-        page.close()
-        context.close()
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        try:
+            page.goto(url, timeout=15000)
+            html = page.content()
+        finally:
+            browser.close()
 
     soup = clean_soup(BeautifulSoup(html, "html.parser"))
     text = soup.get_text("\n", strip=True)
