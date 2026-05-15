@@ -34,6 +34,14 @@ logger = logging.getLogger(__name__)
 
 def _instrument_node(name: str, fn):
     def wrapper(state: GraphState) -> Dict[str, Any]:
+        # ── Emit progress event (if a callback is attached) ───────
+        progress_cb = state.get("_progress_callback")
+        if progress_cb:
+            try:
+                progress_cb(name, "start")
+            except Exception:
+                pass
+
         start = time.time()
         try:
             result = fn(state)
@@ -43,7 +51,13 @@ def _instrument_node(name: str, fn):
             NODE_SUCCESS.labels(node_name=name, status="failure").inc()
             raise
         finally:
-            NODE_LATENCY.labels(node_name=name).observe(time.time() - start)
+            elapsed = time.time() - start
+            NODE_LATENCY.labels(node_name=name).observe(elapsed)
+            if progress_cb:
+                try:
+                    progress_cb(name, "done", elapsed)
+                except Exception:
+                    pass
 
     wrapper.__name__ = fn.__name__
     return wrapper

@@ -12,7 +12,25 @@ import {
     HiOutlineSwitchHorizontal,
 } from 'react-icons/hi';
 import { getCompetitors, getReports } from '../api';
+import {
+    Chart as ChartJS,
+    RadialLinearScale,
+    PointElement,
+    LineElement,
+    Filler,
+    Tooltip,
+    Legend,
+    CategoryScale,
+    LinearScale,
+    BarElement,
+} from 'chart.js';
+import { Radar, Bar } from 'react-chartjs-2';
 import './Analysis.css';
+
+ChartJS.register(
+    RadialLinearScale, PointElement, LineElement, Filler,
+    Tooltip, Legend, CategoryScale, LinearScale, BarElement
+);
 
 const MAX_ITEMS = 3;
 const COLORS = ['var(--accent-primary)', 'var(--info)', 'var(--purple)'];
@@ -572,6 +590,23 @@ export default function Analysis() {
                         </div>
                     </div>
 
+                    {/* ══ CHARTS SECTION ══════════════════════════════ */}
+                    <div className="card comp-charts-card fade-in-up">
+                        <h3 className="comp-section-title"><HiOutlineChartBar /> Visual Analytics</h3>
+                        <div className="charts-grid">
+                            {/* Radar Chart — Category comparison */}
+                            <div className="chart-container">
+                                <h4 className="chart-label">Category Radar</h4>
+                                <RadarChart data={comparisonData} colors={COLOR_HEX} />
+                            </div>
+                            {/* Bar Chart — Signal count & confidence */}
+                            <div className="chart-container">
+                                <h4 className="chart-label">Signal Metrics</h4>
+                                <MetricsBarChart data={comparisonData} colors={COLOR_HEX} />
+                            </div>
+                        </div>
+                    </div>
+
                     {/* 6. Key Differences */}
                     {keyDifferences.length > 0 && (
                         <div className="card comp-diff-card fade-in-up">
@@ -599,6 +634,184 @@ export default function Analysis() {
                     </p>
                 </div>
             )}
+        </div>
+    );
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   CHART COMPONENTS
+   ═══════════════════════════════════════════════════════════════════ */
+
+function RadarChart({ data, colors }) {
+    // Build unified category labels from all companies
+    const allCats = useMemo(() => {
+        const catSet = new Set();
+        data.forEach(c => {
+            (c.features || []).forEach(f => catSet.add(f.category || 'General'));
+        });
+        return [...catSet].sort();
+    }, [data]);
+
+    const chartData = useMemo(() => ({
+        labels: allCats,
+        datasets: data.map((c, i) => {
+            const dist = getCategoryDist(c.features);
+            return {
+                label: c.label,
+                data: allCats.map(cat => dist[cat] || 0),
+                backgroundColor: colors[i] + '25',  // 15% opacity fill
+                borderColor: colors[i],
+                borderWidth: 2,
+                pointBackgroundColor: colors[i],
+                pointBorderColor: '#fff',
+                pointRadius: 4,
+                pointHoverRadius: 6,
+            };
+        }),
+    }), [data, allCats, colors]);
+
+    const options = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    padding: 16,
+                    usePointStyle: true,
+                    pointStyle: 'circle',
+                    font: { family: "'Inter', sans-serif", size: 11, weight: 600 },
+                    color: '#4A5568',
+                },
+            },
+            tooltip: {
+                backgroundColor: 'rgba(26, 29, 35, 0.92)',
+                titleFont: { family: "'Inter', sans-serif", weight: 700 },
+                bodyFont: { family: "'Inter', sans-serif" },
+                padding: 10,
+                cornerRadius: 8,
+            },
+        },
+        scales: {
+            r: {
+                beginAtZero: true,
+                ticks: {
+                    stepSize: 1,
+                    font: { size: 10 },
+                    color: '#8896A6',
+                    backdropColor: 'transparent',
+                },
+                pointLabels: {
+                    font: { family: "'Inter', sans-serif", size: 10, weight: 600 },
+                    color: '#4A5568',
+                },
+                grid: { color: 'rgba(0, 0, 0, 0.06)' },
+                angleLines: { color: 'rgba(0, 0, 0, 0.06)' },
+            },
+        },
+    };
+
+    if (allCats.length < 3) {
+        return <p style={{ color: 'var(--text-muted)', fontSize: '0.84rem', textAlign: 'center', padding: '40px 0' }}>Need at least 3 categories for radar chart</p>;
+    }
+
+    return (
+        <div style={{ height: '320px' }}>
+            <Radar data={chartData} options={options} />
+        </div>
+    );
+}
+
+function MetricsBarChart({ data, colors }) {
+    const chartData = useMemo(() => ({
+        labels: data.map(c => c.label),
+        datasets: [
+            {
+                label: 'Signal Count',
+                data: data.map(c => c.features?.length || 0),
+                backgroundColor: colors.map(c => c + '50'),
+                borderColor: colors,
+                borderWidth: 2,
+                borderRadius: 6,
+                yAxisID: 'y',
+            },
+            {
+                label: 'Avg Confidence (%)',
+                data: data.map(c => Math.round(getAvgConf(c.features) * 100)),
+                backgroundColor: colors.map(c => c + '25'),
+                borderColor: colors.map(c => c + 'AA'),
+                borderWidth: 2,
+                borderRadius: 6,
+                borderDash: [4, 4],
+                yAxisID: 'y1',
+            },
+        ],
+    }), [data, colors]);
+
+    const options = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    padding: 16,
+                    usePointStyle: true,
+                    pointStyle: 'rectRounded',
+                    font: { family: "'Inter', sans-serif", size: 11, weight: 600 },
+                    color: '#4A5568',
+                },
+            },
+            tooltip: {
+                backgroundColor: 'rgba(26, 29, 35, 0.92)',
+                titleFont: { family: "'Inter', sans-serif", weight: 700 },
+                bodyFont: { family: "'Inter', sans-serif" },
+                padding: 10,
+                cornerRadius: 8,
+            },
+        },
+        scales: {
+            x: {
+                grid: { display: false },
+                ticks: {
+                    font: { family: "'Inter', sans-serif", size: 11, weight: 600 },
+                    color: '#4A5568',
+                },
+            },
+            y: {
+                type: 'linear',
+                position: 'left',
+                beginAtZero: true,
+                title: {
+                    display: true,
+                    text: 'Signal Count',
+                    font: { family: "'Inter', sans-serif", size: 11, weight: 600 },
+                    color: '#8896A6',
+                },
+                grid: { color: 'rgba(0, 0, 0, 0.04)' },
+                ticks: { font: { size: 10 }, color: '#8896A6' },
+            },
+            y1: {
+                type: 'linear',
+                position: 'right',
+                beginAtZero: true,
+                max: 100,
+                title: {
+                    display: true,
+                    text: 'Confidence %',
+                    font: { family: "'Inter', sans-serif", size: 11, weight: 600 },
+                    color: '#8896A6',
+                },
+                grid: { drawOnChartArea: false },
+                ticks: { font: { size: 10 }, color: '#8896A6' },
+            },
+        },
+    };
+
+    return (
+        <div style={{ height: '320px' }}>
+            <Bar data={chartData} options={options} />
         </div>
     );
 }

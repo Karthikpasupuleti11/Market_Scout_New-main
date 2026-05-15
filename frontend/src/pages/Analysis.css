@@ -797,6 +797,37 @@
 }
 
 
+/* ═══════════════════════════════════════════════════════════════════
+   VISUAL ANALYTICS — Charts Section
+   ═══════════════════════════════════════════════════════════════════ */
+
+.comp-charts-card {
+    padding: 28px 32px;
+}
+
+.charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+.chart-container {
+    padding: 16px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+}
+
+.chart-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+
+
 /* ── Responsive ────────────────────────────────────────────────── */
 
 @media (max-width: 768px) {
@@ -807,7 +838,8 @@
     .exec-comparison,
     .strength-grid,
     .direction-grid,
-    .signals-comparison {
+    .signals-comparison,
+    .charts-grid {
         grid-template-columns: 1fr;
     }
 }

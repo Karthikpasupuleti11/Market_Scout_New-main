@@ -246,6 +246,24 @@
     transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.pipeline-anim-sub {
+    font-size: 0.7rem;
+    color: var(--text-faint);
+    margin-top: 2px;
+    font-style: italic;
+}
+
+.flow-latency {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    color: var(--success);
+    font-weight: 700;
+    background: rgba(16, 185, 129, 0.08);
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-right: 4px;
+}
+
 
 /* ═══════════════════════════════════════════════════════════════════
    ERROR
@@ -750,7 +768,7 @@
 
 /* Expanded section */
 .signal-expanded {
-    padding: 0 20px 20px 60px;
+    padding: 0 24px 20px 60px;
     /* aligned with title (28px rank + 12px gap + 20px padding) */
     animation: fadeInUp 0.25s ease;
 }
@@ -760,7 +778,6 @@
     line-height: 1.65;
     color: var(--text-muted);
     margin-bottom: 14px;
-    max-width: 700px;
 }
 
 /* Impact Assessment */

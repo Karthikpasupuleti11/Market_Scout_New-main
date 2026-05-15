@@ -353,17 +353,6 @@ a:hover { color: var(--accent-secondary); }
   transform: translateY(-1px);
 }
 
-.topbar-bell-dot {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--error);
-  border: 2px solid var(--bg-primary);
-}
-
 .topbar-avatar {
   width: 36px;
   height: 36px;

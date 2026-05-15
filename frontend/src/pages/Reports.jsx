@@ -14,6 +14,7 @@ import {
 } from "react-icons/hi";
 import { getReports, deleteReport } from "../api";
 import { generateReportPDF } from "../utils/pdfExport";
+import ReportAssistant from "../components/ReportAssistant";
 import './Reports.css';
 
 export default function Reports() {
@@ -243,8 +244,11 @@ export default function Reports() {
                         </div>
                       </div>
                     )}
-                  </div>
-                )}
+
+                      {/* Report Assistant */}
+                      <ReportAssistant report={report} companyName={company} />
+                    </div>
+                  )}
               </div>
             );
           })}

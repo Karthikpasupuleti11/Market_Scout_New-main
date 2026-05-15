@@ -14,14 +14,15 @@ import {
     HiOutlineXCircle,
 } from 'react-icons/hi';
 import { generateReportPDF } from '../utils/pdfExport';
+import ReportAssistant from '../components/ReportAssistant';
 import './RunPipeline.css';
 
 const SUGGESTIONS = ['Google', 'OpenAI', 'Microsoft', 'Anthropic', 'Meta AI', 'Tesla'];
 
 const PIPELINE_STAGES = [
-    'Guardrails', 'Planning', 'Searching', 'Scraping',
-    'Validating', 'Filtering', 'Authority', 'Extracting',
-    'Verifying', 'Scoring', 'Synthesizing'
+    'Guardrails', 'Search Agent', 'Scraper Agent', 'Date Validation',
+    'Content Filter', 'Authority Check', 'Feature Extraction',
+    'Verification', 'Scoring', 'Synthesis'
 ];
 
 /* ── Insight tag logic ─────────────────────────────────────────── */
@@ -78,6 +79,8 @@ export default function RunPipeline() {
         result,
         error,
         activeStage,
+        completedStages,
+        stageLatencies,
         elapsed,
         executePipeline,
         stopPipeline,
@@ -267,6 +270,8 @@ export default function RunPipeline() {
                 <PipelineAnimation
                     company={company}
                     activeStage={activeStage}
+                    completedStages={completedStages}
+                    stageLatencies={stageLatencies}
                     elapsed={elapsed}
                 />
             )}
@@ -486,6 +491,9 @@ export default function RunPipeline() {
                             )}
                         </div>
                     )}
+
+                    {/* ── Report Assistant (inline RAG chat) ─────── */}
+                    <ReportAssistant report={report} companyName={company} />
                 </div>
             )}
         </div>
@@ -564,15 +572,16 @@ function SignalCard({ signal: f, index, isExpanded, onToggle }) {
     );
 }
 
-/* ── Pipeline Animation — now receives stage/elapsed as props ───── */
-function PipelineAnimation({ company, activeStage, elapsed }) {
+/* ── Pipeline Animation — now driven by real SSE progress events ── */
+function PipelineAnimation({ company, activeStage, completedStages, stageLatencies, elapsed }) {
     const formatTime = (s) => {
         const m = Math.floor(s / 60);
         const sec = s % 60;
         return `${m}:${sec.toString().padStart(2, '0')}`;
     };
 
-    const progress = ((activeStage + 1) / PIPELINE_STAGES.length) * 100;
+    const doneCount = completedStages?.size || 0;
+    const progress = (doneCount / PIPELINE_STAGES.length) * 100;
 
     return (
         <div className="card pipeline-anim-card fade-in">
@@ -580,8 +589,15 @@ function PipelineAnimation({ company, activeStage, elapsed }) {
                 <div>
                     <h3>Analyzing <strong>{company}</strong></h3>
                     <p className="pipeline-anim-stage">
-                        Stage {activeStage + 1} of {PIPELINE_STAGES.length} — <span className="pipeline-active-name">{PIPELINE_STAGES[activeStage]}</span>
+                        {activeStage >= 0 && activeStage < PIPELINE_STAGES.length ? (
+                            <>Stage {activeStage + 1} of {PIPELINE_STAGES.length} — <span className="pipeline-active-name">{PIPELINE_STAGES[activeStage]}</span></>
+                        ) : activeStage >= PIPELINE_STAGES.length ? (
+                            <span className="pipeline-active-name">Complete ✓</span>
+                        ) : (
+                            <span>Initializing pipeline…</span>
+                        )}
                     </p>
+                    <p className="pipeline-anim-sub">Real-time progress from backend</p>
                 </div>
                 <div className="pipeline-anim-timer">
                     <span className="timer-value">{formatTime(elapsed)}</span>
@@ -591,11 +607,15 @@ function PipelineAnimation({ company, activeStage, elapsed }) {
 
             <div className="pipeline-flow">
                 {PIPELINE_STAGES.map((stage, i) => {
-                    const state = i < activeStage ? 'done' : i === activeStage ? 'active' : 'pending';
+                    const isDone = completedStages?.has(i);
+                    const isActive = i === activeStage;
+                    const state = isDone ? 'done' : isActive ? 'active' : 'pending';
+                    const latency = stageLatencies?.[i];
+
                     return (
                         <div key={i} className="pipeline-flow-item">
                             <div className={`flow-node ${state}`}>
-                                {state === 'done' ? (
+                                {isDone ? (
                                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                                         <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                     </svg>
@@ -604,8 +624,11 @@ function PipelineAnimation({ company, activeStage, elapsed }) {
                                 )}
                             </div>
                             <span className={`flow-label ${state}`}>{stage}</span>
+                            {isDone && latency != null && (
+                                <span className="flow-latency">{latency.toFixed(1)}s</span>
+                            )}
                             {i < PIPELINE_STAGES.length - 1 && (
-                                <div className={`flow-connector ${i < activeStage ? 'done' : ''}`} />
+                                <div className={`flow-connector ${isDone ? 'done' : ''}`} />
                             )}
                         </div>
                     );

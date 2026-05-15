@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     HiOutlineClock,
     HiOutlineCalendar,
@@ -11,6 +11,7 @@ import {
     HiOutlineClock as HiOutlinePending
 } from 'react-icons/hi';
 import { createSchedule, getSchedules, deleteSchedule } from '../api';
+import { useNotifications } from '../contexts/NotificationContext';
 import './Schedule.css';
 
 export default function Schedule() {
@@ -27,6 +28,8 @@ export default function Schedule() {
     // Delete confirmation state
     const [confirmDelete, setConfirmDelete] = useState(null); // holds the job to delete
     const [deleting, setDeleting] = useState(false);
+    const { addNotification } = useNotifications();
+    const prevJobsRef = useRef(null);
 
     useEffect(() => {
         loadJobs();
@@ -37,6 +40,20 @@ export default function Schedule() {
     async function loadJobs() {
         try {
             const data = await getSchedules();
+            // Detect newly completed/failed jobs for notifications
+            if (prevJobsRef.current) {
+                data.forEach(job => {
+                    const prev = prevJobsRef.current.find(j => j.id === job.id);
+                    if (prev && prev.status !== job.status) {
+                        if (job.status === 'done') {
+                            addNotification('success', `Scheduled Report Ready`, `Report for "${job.company_name}" completed and emailed.`);
+                        } else if (job.status === 'failed') {
+                            addNotification('error', `Scheduled Report Failed`, `Report for "${job.company_name}" failed: ${job.error_msg || 'Unknown error'}`);
+                        }
+                    }
+                });
+            }
+            prevJobsRef.current = data;
             setJobs(data);
         } catch {
             setJobs([]);
@@ -66,6 +83,7 @@ export default function Schedule() {
             setCompany('');
             setDate('');
             setTime('');
+            addNotification('info', 'Report Scheduled', `"${company.trim()}" scheduled for ${localDate.toLocaleString()}`);
             await loadJobs();
         } catch (err) {
             setError(err.message || 'Failed to schedule job');

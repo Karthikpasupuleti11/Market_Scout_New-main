@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, Link } from 'react-router-dom';
-import { HiOutlineBell, HiOutlineInformationCircle } from 'react-icons/hi';
+import { HiOutlineInformationCircle } from 'react-icons/hi';
 import { SettingsProvider } from './contexts/SettingsContext';
-import { PipelineProvider } from './contexts/PipelineContext';   // ← NEW
+import { PipelineProvider } from './contexts/PipelineContext';
+import { NotificationProvider } from './contexts/NotificationContext';
+import NotificationPanel from './components/NotificationPanel';
 import Sidebar from './components/Sidebar';
 import GuidedTour, { hasTourBeenSeen } from './components/GuidedTour';
 import Dashboard from './pages/Dashboard';
@@ -12,7 +14,6 @@ import Reports from './pages/Reports';
 import Competitors from './pages/Competitors';
 import Schedule from './pages/Schedule';
 import About from './pages/About';
-import RagChat from './pages/RagChat';
 
 
 function TopBar({ onStartTour }) {
@@ -41,10 +42,7 @@ function TopBar({ onStartTour }) {
         >
           ?
         </button>
-        <button className="topbar-bell" aria-label="Notifications">
-          <HiOutlineBell />
-          <span className="topbar-bell-dot" />
-        </button>
+        <NotificationPanel />
         <div className="topbar-avatar" title="User">
           <span>U</span>
         </div>
@@ -79,7 +77,6 @@ function AppContent() {
             <Route path="/about" element={<About />} />
             <Route path="/run" element={<RunPipeline />} />
             <Route path="/competitors" element={<Competitors />} />
-            <Route path="/rag" element={<RagChat />} />
           </Routes>
         </main>
       </div>
@@ -95,13 +92,13 @@ function AppContent() {
 export default function App() {
   return (
     <SettingsProvider>
-      {/* PipelineProvider sits OUTSIDE BrowserRouter so state survives
-          route changes — the fetch + timers live here, not in the page */}
-      <PipelineProvider>
-        <BrowserRouter>
-          <AppContent />
-        </BrowserRouter>
-      </PipelineProvider>
+      <NotificationProvider>
+        <PipelineProvider>
+          <BrowserRouter>
+            <AppContent />
+          </BrowserRouter>
+        </PipelineProvider>
+      </NotificationProvider>
     </SettingsProvider>
   );
 }
