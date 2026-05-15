@@ -155,6 +155,7 @@ export default function Analysis() {
 
     // Company mode state
     const [available, setAvailable] = useState([]);
+    const [reportCounts, setReportCounts] = useState({});
     const [selectedCompanies, setSelectedCompanies] = useState([]);
     const [loadingList, setLoadingList] = useState(true);
 
@@ -172,7 +173,20 @@ export default function Analysis() {
     useEffect(() => {
         (async () => {
             setLoadingList(true);
-            try { setAvailable(await getCompetitors()); }
+            try { 
+                const comps = await getCompetitors();
+                setAvailable(comps);
+                const counts = {};
+                await Promise.all(comps.map(async (c) => {
+                    try {
+                        const reps = await getReports(c.name);
+                        counts[c.name] = Array.isArray(reps) ? reps.length : 1;
+                    } catch {
+                        counts[c.name] = 0;
+                    }
+                }));
+                setReportCounts(counts);
+            }
             catch { setAvailable([]); }
             finally { setLoadingList(false); }
         })();
@@ -365,17 +379,23 @@ export default function Analysis() {
                     ) : (
                         <div className="timeline-company-select">
                             <span className="timeline-label">Company</span>
-                            <div className="available-companies">
-                                {available.map(c => (
-                                    <button
-                                        key={c.id}
-                                        className={`available-chip ${timelineCompany === c.name ? 'selected' : ''}`}
-                                        onClick={() => { setTimelineCompany(c.name); setSelectedReports([]); }}
-                                    >
-                                        {c.name}
-                                    </button>
-                                ))}
-                            </div>
+                            {available.filter(c => reportCounts[c.name] >= 2).length === 0 ? (
+                                <p className="selector-hint" style={{ marginTop: 0 }}>
+                                    No companies have a timeline of reports yet. Run the pipeline multiple times for the same company to build a timeline.
+                                </p>
+                            ) : (
+                                <div className="available-companies">
+                                    {available.filter(c => reportCounts[c.name] >= 2).map(c => (
+                                        <button
+                                            key={c.id}
+                                            className={`available-chip ${timelineCompany === c.name ? 'selected' : ''}`}
+                                            onClick={() => { setTimelineCompany(c.name); setSelectedReports([]); }}
+                                        >
+                                            {c.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
 
