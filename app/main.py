@@ -23,6 +23,9 @@ from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 from prometheus_client import make_asgi_app
+from celery.result import AsyncResult
+from tasks.pipeline_tasks import run_market_pipeline
+
 
 load_dotenv()
 
@@ -44,6 +47,13 @@ from observability.metrics import (
     SOURCES_ANALYSED,
 )
 
+from app.api_models import (
+    AgentRequest,
+    AgentResponse,
+    FeatureItem,
+    HealthResponse
+)
+
 # ────────────────────────────────────────────────────────────────────
 # Logging Configuration
 # ────────────────────────────────────────────────────────────────────
@@ -55,72 +65,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
-# ────────────────────────────────────────────────────────────────────
-# Request / Response Schemas
-# ────────────────────────────────────────────────────────────────────
-
-class AgentRequest(BaseModel):
-    company_name: str = Field(
-        ...,
-        min_length=2,
-        max_length=200,
-        description="Name of the company to analyse",
-        examples=["OpenAI", "Google DeepMind", "Anthropic"],
-    )
-    date_window_days: int = Field(
-        7,
-        ge=1,
-        le=365,
-        description="Recency window (in days) used for date validation + scoring + synthesis",
-        examples=[7, 14, 30],
-    )
-
-
-class FeatureItem(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    rank: Optional[int] = None
-    title: Optional[str] = None
-    description: Optional[str] = None
-    category: Optional[str] = None
-    confidence_score: Optional[float] = None
-    impact_assessment: Optional[str] = None
-    source_url: Optional[str] = None
-    source_count: Optional[int] = None
-    key_metrics: Optional[List[str]] = None
-
-
-def _safe_feature(f: dict, idx: int) -> FeatureItem:
-    """Build a FeatureItem from a pipeline dict, mapping alternate key names."""
-    return FeatureItem(
-        rank=f.get("rank", idx + 1),
-        title=f.get("title") or f.get("feature_title") or f.get("feature_summary", ""),
-        description=f.get("description") or f.get("feature_summary") or f.get("feature_text", ""),
-        category=f.get("category"),
-        confidence_score=f.get("confidence_score") or f.get("confidence"),
-        impact_assessment=f.get("impact_assessment"),
-        source_url=f.get("source_url") or f.get("primary_url") or f.get("url"),
-        source_count=f.get("source_count"),
-        key_metrics=f.get("key_metrics") or f.get("metrics"),
-    )
-
-
-class AgentResponse(BaseModel):
-    company_name: str
-    generated_at: str
-    executive_summary: str
-    features: List[FeatureItem] = []
-    total_sources_analysed: int = 0
-    total_features_verified: int = 0
-    all_sources: Optional[List[str]] = None
-    metadata: Optional[Dict[str, Any]] = None
-
-
-class HealthResponse(BaseModel):
-    status: str
-    version: str
-    timestamp: str
 
 
 # ────────────────────────────────────────────────────────────────────
@@ -269,107 +213,33 @@ def health_check():
     )
 
 
-@app.post(
-    "/run-agent",
-    response_model=AgentResponse,
-    tags=["Intelligence"],
-    summary="Run Market Intelligence Pipeline",
-)
+@app.post("/run-agent")
 async def run_agent(request: AgentRequest):
-    """Execute the full intelligence pipeline for a given company."""
-    logger.info("API — Pipeline invoked for: '%s'", request.company_name)
-    ACTIVE_PIPELINES.inc()
 
-    try:
-        graph = app.state.graph
-        # Run the pipeline in a thread pool to avoid blocking the event loop
-        result = await asyncio.to_thread(
-            graph.invoke,
-            {
-                "company_name": request.company_name,
-                "date_window_days": request.date_window_days,
-            },
-        )
+    task = run_market_pipeline.delay(
+        request.company_name,
+        request.date_window_days
+    )
 
-        report = result.get("synthesis_report", {})
-        if not report:
-            PIPELINE_RUNS.labels(status="error").inc()
-            raise HTTPException(status_code=500, detail="Pipeline produced no report.")
+    return {
+        "task_id": task.id,
+        "status": "processing"
+    }
 
-        # ── Record metrics ─────────────────────────────────────────
-        error = result.get("error") or report.get("metadata", {}).get("error")
-        features = report.get("features", [])
+@app.get("/task-status/{task_id}")
+async def task_status(task_id: str):
 
-        if error and not features:
-            PIPELINE_RUNS.labels(status="error").inc()
-        else:
-            PIPELINE_RUNS.labels(status="completed").inc()
+    task = AsyncResult(task_id)
 
-        # Feature-level metrics
-        for f in features:
-            cat = f.get("category", "unknown") if isinstance(f, dict) else "unknown"
-            FEATURES_EXTRACTED.labels(company=request.company_name, category=cat).inc()
-            score = f.get("confidence_score", 0) if isinstance(f, dict) else 0
-            CONFIDENCE_SCORE.observe(score)
+    if task.ready():
+        return {
+            "status": task.status,
+            "result": task.result
+        }
 
-        FEATURES_VERIFIED.labels(company=request.company_name).inc(
-            report.get("total_features_verified", 0)
-        )
-        SOURCES_ANALYSED.observe(report.get("total_sources_analysed", 0))
-
-        # ── Build response ─────────────────────────────────────────
-        safe_features = []
-        for i, f in enumerate(features):
-            if isinstance(f, dict):
-                try:
-                    safe_features.append(_safe_feature(f, i))
-                except Exception as feat_exc:
-                    logger.warning("API — Skipping invalid feature #%d: %s — data: %s", i, feat_exc, f)
-            else:
-                logger.warning("API — Skipping non-dict feature #%d: %s", i, type(f))
-
-        # Ensure all_sources is a list of strings
-        raw_sources = report.get("all_sources") or []
-        safe_sources = [str(s) for s in raw_sources] if isinstance(raw_sources, list) else None
-
-        response = AgentResponse(
-            company_name=report.get("company_name", request.company_name),
-            generated_at=report.get("generated_at", datetime.now(timezone.utc).isoformat()),
-            executive_summary=report.get("executive_summary", "No summary available."),
-            features=safe_features,
-            total_sources_analysed=report.get("total_sources_analysed", 0),
-            total_features_verified=report.get("total_features_verified", 0),
-            all_sources=safe_sources,
-            metadata=report.get("metadata"),
-        )
-
-        # ── Persist to PostgreSQL ──────────────────────────────────
-        try:
-            db = next(get_db())
-            crud.save_report(db, request.company_name, report)
-            logger.info("API — Report saved to PostgreSQL for '%s'", request.company_name)
-        except Exception as db_exc:
-            logger.warning("API — DB persistence failed (non-fatal): %s", db_exc)
-
-        logger.info(
-            "API — Report: %d features, %d sources",
-            len(response.features), response.total_sources_analysed,
-        )
-        return response
-
-    except HTTPException:
-        raise
-    except ValueError as exc:
-        PIPELINE_RUNS.labels(status="guardrail_blocked").inc()
-        logger.error("API — ValueError during response build: %s", exc, exc_info=True)
-        raise HTTPException(status_code=422, detail=str(exc))
-    except Exception as exc:
-        PIPELINE_RUNS.labels(status="error").inc()
-        logger.error("API — Unexpected error: %s", exc, exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Internal error: {str(exc)}")
-    finally:
-        ACTIVE_PIPELINES.dec()
-
+    return {
+        "status": task.status
+    }
 
 # ────────────────────────────────────────────────────────────────────
 # History & CRUD Endpoints

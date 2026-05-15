@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useRef, useCallback } from 'react';
-import { runPipeline } from '../api';
+import { runPipeline, getTaskStatus } from '../api';
 import { useSettings } from './SettingsContext';
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -67,22 +67,82 @@ export function PipelineProvider({ children }) {
         startClocks();
 
         try {
-            const data = await runPipeline(companyName.trim(), {
-                signal: abortControllerRef.current.signal,
-                dateWindowDays: settings.analysis.timeWindow,
-            });
-            setResult(data);
-        } catch (err) {
-            if (err.name === 'AbortError') {
-                setError('Pipeline stopped by user.');
-            } else {
-                setError(err.message || 'Pipeline execution failed');
+
+    // ── Start Celery Task ─────────────────────
+    const taskResponse = await runPipeline(
+        companyName.trim(),
+        {
+            signal: abortControllerRef.current.signal,
+            dateWindowDays: settings.analysis.timeWindow,
+        }
+    );
+
+    const taskId = taskResponse.task_id;
+
+    // ── Poll Task Status ──────────────────────
+    const pollInterval = setInterval(async () => {
+
+        try {
+
+            const statusData =
+                await getTaskStatus(taskId);
+
+            // SUCCESS
+            if (statusData.status === "SUCCESS") {
+
+                setResult(statusData.result);
+
+                clearInterval(pollInterval);
+
+                stopClocks();
+
+                setLoading(false);
             }
-        } finally {
-            abortControllerRef.current = null;
+
+            // FAILURE
+            else if (statusData.status === "FAILURE") {
+
+                setError("Pipeline execution failed");
+
+                clearInterval(pollInterval);
+
+                stopClocks();
+
+                setLoading(false);
+            }
+
+        } catch (pollErr) {
+
+            setError(
+                pollErr.message || "Polling failed"
+            );
+
+            clearInterval(pollInterval);
+
             stopClocks();
+
             setLoading(false);
         }
+
+    }, 5000);
+
+} catch (err) {
+
+    if (err.name === 'AbortError') {
+
+        setError('Pipeline stopped by user.');
+
+    } else {
+
+        setError(
+            err.message || 'Pipeline execution failed'
+        );
+    }
+
+    stopClocks();
+
+    setLoading(false);
+}
     }, [settings.analysis.timeWindow, startClocks, stopClocks]);
 
     // ── Public: stop the running pipeline ────────────────────────
