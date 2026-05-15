@@ -48,11 +48,12 @@ export default function NotificationPanel() {
     return (
         <div className="notif-wrapper" ref={panelRef}>
             <button
-                className={`topbar-bell ${open ? 'active' : ''}`}
+                className={`topbar-link ${open ? 'active' : ''}`}
                 aria-label="Notifications"
                 onClick={handleToggle}
             >
                 <HiOutlineBell />
+                <span>Notifications</span>
                 {unreadCount > 0 && (
                     <span className="topbar-bell-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
                 )}

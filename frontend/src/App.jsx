@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, Link } from 'react-router-dom';
-import { HiOutlineInformationCircle } from 'react-icons/hi';
+import { HiOutlineInformationCircle, HiOutlineQuestionMarkCircle } from 'react-icons/hi';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { PipelineProvider } from './contexts/PipelineContext';
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -35,17 +35,15 @@ function TopBar({ onStartTour }) {
           <span>About Us</span>
         </NavLink>
         <button
-          className="tour-help-btn"
+          className="topbar-link"
           onClick={onStartTour}
           title="Take a guided tour"
           aria-label="Start guided tour"
         >
-          ?
+          <HiOutlineQuestionMarkCircle />
+          <span>Tour</span>
         </button>
         <NotificationPanel />
-        <div className="topbar-avatar" title="User">
-          <span>U</span>
-        </div>
       </div>
     </div>
   );
