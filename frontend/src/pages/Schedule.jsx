@@ -12,6 +12,7 @@ import {
 } from 'react-icons/hi';
 import { createSchedule, getSchedules, deleteSchedule } from '../api';
 import { useNotifications } from '../contexts/NotificationContext';
+import { formatDateTime } from '../utils/formatDate';
 import './Schedule.css';
 
 export default function Schedule() {
@@ -83,7 +84,7 @@ export default function Schedule() {
             setCompany('');
             setDate('');
             setTime('');
-            addNotification('info', 'Report Scheduled', `"${company.trim()}" scheduled for ${localDate.toLocaleString()}`);
+            addNotification('info', 'Report Scheduled', `"${company.trim()}" scheduled for ${formatDateTime(localDate)}`);
             await loadJobs();
         } catch (err) {
             setError(err.message || 'Failed to schedule job');
@@ -224,7 +225,7 @@ export default function Schedule() {
                                             <StatusBadge status={job.status} />
                                         </div>
                                         <div className="job-meta">
-                                            <span><HiOutlineClock/> {new Date(job.scheduled_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
+                                            <span><HiOutlineClock/> {formatDateTime(job.scheduled_at)}</span>
                                             <span>•</span>
                                             <span><HiOutlineMail/> {job.email}</span>
                                         </div>

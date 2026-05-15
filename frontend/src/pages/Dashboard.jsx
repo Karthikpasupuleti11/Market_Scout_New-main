@@ -11,6 +11,7 @@ import {
   HiOutlineChevronRight,
 } from "react-icons/hi";
 import ThemeToggle from "./ThemeToggle";
+import { formatDateTime } from "../utils/formatDate";
 import './Dashboard.css';
 
 export default function Dashboard() {
@@ -43,15 +44,17 @@ export default function Dashboard() {
   const latestReport = dashStats?.latest_report;
 
   const latestRunDate = latestReport?.created_at
-    ? new Date(latestReport.created_at).toLocaleDateString([], { dateStyle: 'medium' })
+    ? formatDateTime(latestReport.created_at)
     : 'No runs yet';
 
   const recentFocus = latestReport?.company_name || 'No company yet';
 
   const freshnessLabel = latestReport?.created_at
     ? (() => {
+        let d = latestReport.created_at;
+        if (typeof d === 'string' && !d.endsWith('Z') && !d.match(/[+-]\d{2}:?\d{2}$/)) d += 'Z';
         const daysAgo = Math.max(0, Math.floor(
-          (Date.now() - new Date(latestReport.created_at).getTime()) / (1000 * 60 * 60 * 24)
+          (Date.now() - new Date(d).getTime()) / (1000 * 60 * 60 * 24)
         ));
         if (daysAgo === 0) return 'Today';
         if (daysAgo === 1) return '1 day ago';

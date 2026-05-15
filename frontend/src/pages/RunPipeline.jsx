@@ -15,6 +15,7 @@ import {
 } from 'react-icons/hi';
 import { generateReportPDF } from '../utils/pdfExport';
 import ReportAssistant from '../components/ReportAssistant';
+import { formatDateTime } from '../utils/formatDate';
 import './RunPipeline.css';
 
 const SUGGESTIONS = ['Google', 'OpenAI', 'Microsoft', 'Anthropic', 'Meta AI', 'Tesla'];
@@ -300,7 +301,7 @@ export default function RunPipeline() {
                                     <span className="badge badge-info">{report.total_sources_analysed || 0} Sources</span>
                                     {distribution.length > 0 && <span className="badge badge-purple">{distribution.length} Themes</span>}
                                     {report.generated_at && (
-                                        <span className="badge badge-warning">{new Date(report.generated_at).toLocaleDateString()}</span>
+                                        <span className="badge badge-warning">{formatDateTime(report.generated_at)}</span>
                                     )}
                                 </div>
                             </div>

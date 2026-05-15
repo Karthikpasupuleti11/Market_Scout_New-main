@@ -4,11 +4,12 @@ import {
     HiOutlineBell,
     HiOutlineCheckCircle,
     HiOutlineXCircle,
-    HiOutlineInformationCircle,
-    HiOutlineExclamation,
     HiOutlineTrash,
     HiOutlineX,
+    HiOutlineInformationCircle,
+    HiOutlineExclamation,
 } from 'react-icons/hi';
+import { formatDateTime } from '../utils/formatDate';
 import './NotificationPanel.css';
 
 const TYPE_CONFIG = {
@@ -18,16 +19,7 @@ const TYPE_CONFIG = {
     warning: { icon: HiOutlineExclamation, color: 'var(--warning)', label: 'Warning' },
 };
 
-function timeAgo(dateStr) {
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    return `${Math.floor(hrs / 24)}d ago`;
-}
-
+// Removed timeAgo in favor of exact formatDateTime
 export default function NotificationPanel() {
     const { notifications, unreadCount, markAsRead, markAllRead, removeNotification, clearAll } = useNotifications();
     const [open, setOpen] = useState(false);
@@ -107,7 +99,7 @@ export default function NotificationPanel() {
                                         <div className="notif-content">
                                             <div className="notif-title">{n.title}</div>
                                             <div className="notif-message">{n.message}</div>
-                                            <div className="notif-time">{timeAgo(n.timestamp)}</div>
+                                            <div className="notif-time">{formatDateTime(n.timestamp)}</div>
                                         </div>
                                         <button
                                             className="notif-remove"

@@ -12,6 +12,8 @@ import {
     HiOutlineSwitchHorizontal,
 } from 'react-icons/hi';
 import { getCompetitors, getReports } from '../api';
+import { useSettings } from '../contexts/SettingsContext';
+import { formatDateTime } from '../utils/formatDate';
 import {
     Chart as ChartJS,
     RadialLinearScale,
@@ -143,8 +145,7 @@ function getCategoryOverlap(items) {
 }
 
 function formatDate(dateStr) {
-    if (!dateStr) return '';
-    return new Date(dateStr).toLocaleDateString([], { dateStyle: 'medium' });
+    return formatDateTime(dateStr);
 }
 
 

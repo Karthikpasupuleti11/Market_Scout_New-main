@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 
 import {
   HiOutlineSearch,
@@ -15,6 +15,7 @@ import {
 import { getReports, deleteReport } from "../api";
 import { generateReportPDF } from "../utils/pdfExport";
 import ReportAssistant from "../components/ReportAssistant";
+import { formatDateTime } from '../utils/formatDate';
 import './Reports.css';
 
 export default function Reports() {
@@ -26,6 +27,30 @@ export default function Reports() {
   const [searched, setSearched] = useState(false);
   const [expanded, setExpanded] = useState(null);
   const [pdfLoadingIdx, setPdfLoadingIdx] = useState(null);
+
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.state?.autoOpenCompany) {
+      const comp = location.state.autoOpenCompany;
+      setCompany(comp);
+      setLoading(true);
+      setSearched(true);
+      
+      getReports(comp)
+        .then(data => {
+          const arr = Array.isArray(data) ? data : [data];
+          setReports(arr);
+          if (arr.length > 0) {
+            setExpanded(0);
+          }
+        })
+        .catch(() => setReports([]))
+        .finally(() => setLoading(false));
+
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   // Delete modal state
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -177,7 +202,7 @@ export default function Reports() {
                     <h3>{report.company_name || company}</h3>
                     <div className="report-meta-row">
                       {report.created_at && (
-                        <span>{new Date(report.created_at).toLocaleDateString([], { dateStyle: 'medium' })}</span>
+                        <span>{formatDateTime(report.created_at)}</span>
                       )}
                       <span className="meta-dot">·</span>
                       <span>{report.total_features || 0} signals</span>
@@ -274,7 +299,7 @@ export default function Reports() {
                 Are you sure you want to delete the report for{' '}
                 <strong className="danger-text">{deleteTarget.report.company_name || company}</strong>
                 {deleteTarget.report.created_at && (
-                  <> from <strong>{new Date(deleteTarget.report.created_at).toLocaleDateString([], { dateStyle: 'medium' })}</strong></>
+                  <> from <strong>{formatDateTime(deleteTarget.report.created_at)}</strong></>
                 )}?
               </p>
               <p className="modal-warning">
