@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useRef, useCallback } from 'react';
-import { runPipelineSSE } from '../api';
+import { runPipeline, getTaskStatus } from '../api';
 import { useSettings } from './SettingsContext';
 import { useNotifications } from './NotificationContext';
 
@@ -76,62 +76,83 @@ export function PipelineProvider({ children }) {
         startClock();
 
         try {
-            await runPipelineSSE(companyName.trim(), {
-                signal: abortControllerRef.current.signal,
-                dateWindowDays: settings.analysis.timeWindow,
 
-                onProgress: (node, status, nodeElapsed) => {
-                    const stageIdx = NODE_TO_STAGE[node];
-                    if (stageIdx === undefined) return; // skip error/exit nodes
+    // ── Start Celery Task ─────────────────────
+    const taskResponse = await runPipeline(
+        companyName.trim(),
+        {
+            signal: abortControllerRef.current.signal,
+            dateWindowDays: settings.analysis.timeWindow,
+        }
+    );
 
-                    if (status === 'start') {
-                        setActiveStage(stageIdx);
-                    } else if (status === 'done') {
-                        setCompletedStages(prev => {
-                            const next = new Set(prev);
-                            next.add(stageIdx);
-                            return next;
-                        });
-                        setStageLatencies(prev => ({
-                            ...prev,
-                            [stageIdx]: nodeElapsed,
-                        }));
-                    }
-                },
+    const taskId = taskResponse.task_id;
 
-                onComplete: (data) => {
-                    // Mark all stages as done
-                    setActiveStage(Object.keys(NODE_TO_STAGE).length);
-                    setResult(data);
-                    const featureCount = data?.features?.length || 0;
-                    addNotification(
-                        'success',
-                        `Analysis Complete: ${companyName.trim()}`,
-                        `Report generated with ${featureCount} signal${featureCount !== 1 ? 's' : ''} detected.`
-                    );
-                },
+    // ── Poll Task Status ──────────────────────
+    const pollInterval = setInterval(async () => {
 
-                onError: (detail) => {
-                    setError(detail || 'Pipeline execution failed');
-                    addNotification(
-                        'error',
-                        `Analysis Failed: ${companyName.trim()}`,
-                        detail || 'Pipeline execution failed'
-                    );
-                },
-            });
-        } catch (err) {
-            if (err.name === 'AbortError') {
-                setError('Pipeline stopped by user.');
-            } else {
-                setError(err.message || 'Pipeline execution failed');
+        try {
+
+            const statusData =
+                await getTaskStatus(taskId);
+
+            // SUCCESS
+            if (statusData.status === "SUCCESS") {
+
+                setResult(statusData.result);
+
+                clearInterval(pollInterval);
+
+                stopClocks();
+
+                setLoading(false);
             }
-        } finally {
-            abortControllerRef.current = null;
-            stopClock();
+
+            // FAILURE
+            else if (statusData.status === "FAILURE") {
+
+                setError("Pipeline execution failed");
+
+                clearInterval(pollInterval);
+
+                stopClocks();
+
+                setLoading(false);
+            }
+
+        } catch (pollErr) {
+
+            setError(
+                pollErr.message || "Polling failed"
+            );
+
+            clearInterval(pollInterval);
+
+            stopClocks();
+
             setLoading(false);
         }
-    }, [settings.analysis.timeWindow, startClock, stopClock, addNotification]);
+
+    }, 5000);
+
+} catch (err) {
+
+    if (err.name === 'AbortError') {
+
+        setError('Pipeline stopped by user.');
+
+    } else {
+
+        setError(
+            err.message || 'Pipeline execution failed'
+        );
+    }
+
+    stopClocks();
+
+    setLoading(false);
+}
+    }, [settings.analysis.timeWindow, startClocks, stopClocks]);
 
     // ── Public: stop the running pipeline ────────────────────────
     const stopPipeline = useCallback(() => {

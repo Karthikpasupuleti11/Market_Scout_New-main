@@ -223,3 +223,16 @@ export async function clearStorage() {
     }
     return res.json();
 }
+
+export async function getTaskStatus(taskId) {
+
+    const res = await fetch(
+        `${API_BASE}/task-status/${taskId}`
+    );
+
+    if (!res.ok) {
+        throw new Error(`Error ${res.status}`);
+    }
+
+    return res.json();
+}
