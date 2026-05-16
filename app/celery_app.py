@@ -24,6 +24,8 @@ from celery.signals import (
     task_postrun,
     task_prerun,
     task_retry,
+    worker_init,
+    worker_process_init,
     worker_ready,
 )
 from kombu import Queue
@@ -143,6 +145,38 @@ def _setup_logger(logger, *args, **kwargs):
     )
     for h in logger.handlers:
         h.setFormatter(fmt)
+
+
+def _start_metrics_server():
+    """Start Prometheus HTTP server in the worker process so task-emitted
+    metrics (PIPELINE_RUNS, FEATURES_EXTRACTED, ACTIVE_PIPELINES, ...) become
+    scrapable. With --pool=threads all task threads share this single process
+    + registry, so all counter increments are exposed."""
+    import os
+
+    from prometheus_client import start_http_server
+
+    port = int(os.getenv("WORKER_METRICS_PORT", "9100"))
+    try:
+        start_http_server(port, addr="0.0.0.0")
+        logger.info("CELERY — worker metrics server listening on :%d", port)
+    except OSError as exc:
+        logger.debug("CELERY — metrics server bind skipped: %s", exc)
+
+
+@worker_init.connect
+def _on_worker_init(sender=None, **kwargs):
+    # Threads / solo / gevent / eventlet pools: tasks run in the main worker
+    # process. Bind here so metrics are scrapable.
+    _start_metrics_server()
+
+
+@worker_process_init.connect
+def _on_worker_process_init(sender=None, **kwargs):
+    # Prefork pool: tasks run in forked children. Only the first child to bind
+    # will hold the port; the rest log a debug-level skip. Switch to
+    # --pool=threads for full metric coverage with concurrency > 1.
+    _start_metrics_server()
 
 
 @worker_ready.connect

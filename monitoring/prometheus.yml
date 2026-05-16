@@ -3,10 +3,37 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: "market-scout"
+  # FastAPI application metrics (request counters, SSE-path pipeline metrics)
+  - job_name: "market-scout-api"
     metrics_path: "/metrics"
     static_configs:
-      - targets: ["metrics.market-scout.me"]
+      - targets: ["app:8000"]
         labels:
           service: "market-intelligence-scout"
+          component: "api"
           environment: "production"
+
+  # Celery worker metrics (pipeline/feature/LLM counters emitted in worker)
+  - job_name: "market-scout-worker"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["celery_worker:9100"]
+        labels:
+          service: "market-intelligence-scout"
+          component: "celery_worker"
+          environment: "production"
+
+  # Maintenance worker (periodic task metrics)
+  - job_name: "market-scout-worker-maint"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["celery_worker_maint:9100"]
+        labels:
+          service: "market-intelligence-scout"
+          component: "celery_worker_maint"
+          environment: "production"
+
+  # Prometheus self-scrape
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]

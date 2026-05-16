@@ -52,17 +52,20 @@ services:
     command: >
       celery -A app.celery_app worker
       --loglevel=info
+      --pool=threads
       --concurrency=2
       --queues=pipeline,scheduled
       --hostname=worker.pipeline@%h
-      --max-tasks-per-child=20
     env_file: .env
+    expose:
+      - "9100"     # Prometheus metrics port (internal network only)
     environment:
       - DATABASE_URL=postgresql://admin:admin@postgres:5432/market_db
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - WORKER_METRICS_PORT=9100
     depends_on:
       postgres:
         condition: service_healthy
@@ -85,16 +88,20 @@ services:
     command: >
       celery -A app.celery_app worker
       --loglevel=info
+      --pool=threads
       --concurrency=1
       --queues=maintenance
       --hostname=worker.maint@%h
     env_file: .env
+    expose:
+      - "9100"
     environment:
       - DATABASE_URL=postgresql://admin:admin@postgres:5432/market_db
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - WORKER_METRICS_PORT=9100
     depends_on:
       postgres:
         condition: service_healthy
