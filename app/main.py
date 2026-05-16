@@ -53,6 +53,7 @@ from app.api_models import (
     FeatureItem,
     HealthResponse
 )
+from utils.feature_utils import _safe_feature
 
 # ────────────────────────────────────────────────────────────────────
 # Logging Configuration
@@ -296,6 +297,8 @@ def task_status(task_id: str):
             payload["result"] = res.result
         elif res.failed():
             payload["error"] = str(res.result)
+        elif res.status == "PROGRESS":
+            payload["progress"] = res.info if isinstance(res.info, dict) else {}
         return payload
     except Exception as exc:
         logger.error("API — task-status error for %s: %s", task_id, exc, exc_info=True)
@@ -516,24 +519,29 @@ def delete_competitor(competitor_id: int, db: Session = Depends(get_db)):
 # ────────────────────────────────────────────────────────────────────
 
 @app.post("/schedules", response_model=schemas.ScheduledJobResponse, tags=["Schedules"])
-def create_schedule(job: schemas.ScheduledJobCreate, request: Request, db: Session = Depends(get_db)):
+def create_schedule(job: schemas.ScheduledJobCreate, db: Session = Depends(get_db)):
     """Create a new scheduled report job."""
     # Ensure scheduled format is UTC
     if job.scheduled_at <= datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Scheduled time must be in the future.")
         
     db_job = crud.create_scheduled_job(db, job.company_name, job.email, job.scheduled_at)
-    
-    # Add to APScheduler
-    scheduler.schedule_job(
-        job_id=db_job.id,
-        run_at=job.scheduled_at,
-        company_name=job.company_name,
-        email=job.email,
-        db_factory=SessionLocal, # we need a factory for the background thread
-        graph=request.app.state.graph
-    )
-    
+
+    # The standalone scheduler process polls the DB and arms new pending jobs.
+    # If ENABLE_SCHEDULER is True in *this* process (single-worker dev mode),
+    # arm immediately so the trigger fires without waiting for the poll.
+    if settings.ENABLE_SCHEDULER:
+        try:
+            scheduler.schedule_job(
+                job_id=db_job.id,
+                run_at=job.scheduled_at,
+                company_name=job.company_name,
+                email=job.email,
+                date_window_days=getattr(job, "date_window_days", 7),
+            )
+        except RuntimeError as exc:
+            logger.warning("SCHEDULES — in-process arm skipped: %s", exc)
+
     return db_job
 
 
@@ -549,7 +557,12 @@ def delete_schedule(job_id: int, db: Session = Depends(get_db)):
     deleted = crud.delete_scheduled_job(db, job_id)
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found.")
-    
-    # Remove from APScheduler
-    scheduler.cancel_job(job_id)
+
+    # Remove from APScheduler if running in-process; otherwise the standalone
+    # scheduler will notice the row is gone on its next sweep.
+    if settings.ENABLE_SCHEDULER:
+        try:
+            scheduler.cancel_job(job_id)
+        except RuntimeError:
+            pass
     return
