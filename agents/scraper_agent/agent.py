@@ -43,7 +43,7 @@ async def process_single_url(item, company):
     for strategy in strategies:
         try:
             logger.info("SCRAPER — Trying tool: %s", strategy)
-            result = TOOLS[strategy](url)
+            result = await asyncio.to_thread(TOOLS[strategy], url)
 
             if result and result.get("text"):
                 logger.info("SCRAPER — Tool succeeded: %s", strategy)
