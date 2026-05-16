@@ -287,14 +287,10 @@ async def run_agent(request: AgentRequest):
 
     try:
         graph = app.state.graph
-        # Run the pipeline in a thread pool to avoid blocking the event loop
-        result = await asyncio.to_thread(
-            graph.invoke,
-            {
-                "company_name": request.company_name,
-                "date_window_days": request.date_window_days,
-            },
-        )
+        result = await graph.ainvoke({
+            "company_name": request.company_name,
+            "date_window_days": request.date_window_days,
+        })
 
         report = result.get("synthesis_report", {})
         if not report:
