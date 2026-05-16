@@ -110,3 +110,6 @@ class GraphState(TypedDict, total=False):
     # ── Control flow ───────────────────────────────────────────────
     error: str                                # Error message (triggers failure exit)
     retry_count: int                          # Retry counter for transient failures
+
+    # ── SSE Progress streaming (internal, not persisted) ───────────
+    _progress_callback: Any                   # Callable for real-time node progress

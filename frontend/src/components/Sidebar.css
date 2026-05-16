@@ -233,6 +233,27 @@
     background: var(--accent-primary);
     box-shadow: 0 0 4px rgba(46, 125, 50, 0.4);
     animation: pulse-glow 2.5s ease infinite;
+    transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.status-dot.offline {
+    background: #ef4444;
+    box-shadow: 0 0 4px rgba(239, 68, 68, 0.4);
+    animation: none;
+}
+
+.status-dot.checking {
+    background: #f59e0b;
+    box-shadow: 0 0 4px rgba(245, 158, 11, 0.4);
+    animation: pulse-glow 1s ease infinite;
+}
+
+.footer-status.offline {
+    color: #ef4444;
+}
+
+.footer-status.checking {
+    color: #f59e0b;
 }
 
 .footer-badge {

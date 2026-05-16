@@ -5,7 +5,9 @@ from .dates import from_meta, from_text
 
 
 def scrape(url: str):
-    r = requests.get(url, timeout=10)
+    # (connect timeout, read timeout) — fail fast on dead/slow hosts
+    # so the scraper falls through to newspaper3k without burning 10s.
+    r = requests.get(url, timeout=(3, 6))
     soup = clean_soup(BeautifulSoup(r.text, "html.parser"))
 
     text = soup.get_text("\n", strip=True)

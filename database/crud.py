@@ -205,3 +205,27 @@ def delete_report(db: Session, report_id: int) -> bool:
     db.delete(report)
     db.commit()
     return True
+
+
+def get_latest_report(db: Session) -> dict | None:
+    """Get the most recent report across ALL companies.
+
+    Returns a dict with report info + company name, or None.
+    """
+    result = (
+        db.query(Report, Competitor.name)
+        .join(Competitor, Report.competitor_id == Competitor.id)
+        .order_by(Report.created_at.desc())
+        .first()
+    )
+    if not result:
+        return None
+    report, company_name = result
+    return {
+        "id": report.id,
+        "company_name": company_name,
+        "created_at": report.created_at.isoformat() if report.created_at else None,
+        "total_features": report.total_features,
+        "total_sources": report.total_sources,
+        "executive_summary": report.executive_summary,
+    }

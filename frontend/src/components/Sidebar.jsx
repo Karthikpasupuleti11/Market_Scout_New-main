@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
     HiOutlineGlobeAlt,
@@ -8,9 +8,9 @@ import {
     HiOutlineClock,
     HiOutlineChartBar,
     HiOutlineCog,
-    HiOutlineChatAlt2,
 } from 'react-icons/hi';
 import { SiPrometheus, SiGrafana } from 'react-icons/si';
+import { getHealth } from '../api';
 import SettingsPanel from './SettingsPanel';
 import './Sidebar.css';
 
@@ -19,7 +19,6 @@ const PRIMARY_NAV = [
     { path: '/intelligence', label: 'Intelligence',  icon: <HiOutlineLightningBolt /> },
     { path: '/analysis',    label: 'Analysis',      icon: <HiOutlineChartBar /> },
     { path: '/reports',     label: 'Reports',       icon: <HiOutlineDocumentText /> },
-    { path: '/rag',         label: 'Report Assistant', icon: <HiOutlineChatAlt2 /> },
     { path: '/watchlist',   label: 'Watchlist',     icon: <HiOutlineEye /> },
 ];
 
@@ -28,14 +27,33 @@ const SECONDARY_NAV = [
 ];
 
 const EXTERNAL_LINKS = [
-    { href: 'http://localhost:8000/docs', label: 'API Docs',   icon: <HiOutlineChartBar /> },
-    { href: 'http://localhost:9090',      label: 'Prometheus', icon: <SiPrometheus /> },
-    { href: 'http://localhost:3000',      label: 'Grafana',    icon: <SiGrafana /> },
+{ href: 'https://api.market-scout.me/docs', label: 'API Docs',   icon: <HiOutlineChartBar /> },
+    { href: 'https://metrics.market-scout.me',      label: 'Prometheus', icon: <SiPrometheus /> },
+    { href: 'https://grafana.market-scout.me',      label: 'Grafana',    icon: <SiGrafana /> },
 ];
 
 export default function Sidebar() {
     const location = useLocation();
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [backendUp, setBackendUp] = useState(null); // null = checking, true = up, false = down
+    const intervalRef = useRef(null);
+
+    useEffect(() => {
+        async function check() {
+            try {
+                await getHealth();
+                setBackendUp(true);
+            } catch {
+                setBackendUp(false);
+            }
+        }
+        check();
+        intervalRef.current = setInterval(check, 15000);
+        return () => clearInterval(intervalRef.current);
+    }, []);
+
+    const statusLabel = backendUp === null ? 'Checking…' : backendUp ? 'System Online' : 'System Offline';
+    const statusClass = backendUp === null ? 'checking' : backendUp ? 'online' : 'offline';
 
     return (
         <>
@@ -103,9 +121,9 @@ export default function Sidebar() {
 
                 {/* ── Footer ──────────────────────────────────────── */}
                 <div className="sidebar-footer">
-                    <div className="footer-status">
-                        <span className="status-dot" />
-                        <span>System Online</span>
+                    <div className={`footer-status ${statusClass}`}>
+                        <span className={`status-dot ${statusClass}`} />
+                        <span>{statusLabel}</span>
                     </div>
                     <div className="footer-badge">v2.0</div>
                 </div>
@@ -119,3 +137,4 @@ export default function Sidebar() {
         </>
     );
 }
+

@@ -12,6 +12,7 @@ services:
       - DATABASE_URL=postgresql://admin:admin@postgres:5432/market_db
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - ENABLE_SCHEDULER=False
     depends_on:
       postgres:
         condition: service_healthy

@@ -36,8 +36,14 @@ import inspect
 
 
 def _instrument_node(name: str, fn):
-
-    async def wrapper(state: GraphState) -> Dict[str, Any]:
+    def wrapper(state: GraphState) -> Dict[str, Any]:
+        # ── Emit progress event (if a callback is attached) ───────
+        progress_cb = state.get("_progress_callback")
+        if progress_cb:
+            try:
+                progress_cb(name, "start")
+            except Exception:
+                pass
 
         start = time.time()
 
@@ -68,10 +74,13 @@ def _instrument_node(name: str, fn):
             raise
 
         finally:
-
-            NODE_LATENCY.labels(
-                node_name=name
-            ).observe(time.time() - start)
+            elapsed = time.time() - start
+            NODE_LATENCY.labels(node_name=name).observe(elapsed)
+            if progress_cb:
+                try:
+                    progress_cb(name, "done", elapsed)
+                except Exception:
+                    pass
 
     wrapper.__name__ = fn.__name__
 

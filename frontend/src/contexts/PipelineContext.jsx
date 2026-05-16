@@ -1,16 +1,32 @@
 import { createContext, useContext, useState, useRef, useCallback } from 'react';
 import { runPipeline, getTaskStatus } from '../api';
 import { useSettings } from './SettingsContext';
+import { useNotifications } from './NotificationContext';
 
 /* ═══════════════════════════════════════════════════════════════════
-   PIPELINE CONTEXT — Persists pipeline execution state across routes
-   so navigating away and back keeps the animation + result intact.
+   PIPELINE CONTEXT — Real-time SSE-powered pipeline execution.
+   Node progress is streamed live from the backend (no fake timers).
    ═══════════════════════════════════════════════════════════════════ */
+
+// Map backend node names → frontend stage index
+const NODE_TO_STAGE = {
+    guardrails:         0,
+    search_agent:       1,   // "Planning" in the graph = search agent planning queries
+    scraper_agent:      2,   // "Searching" + "Scraping"
+    date_validation:    3,
+    content_filter:     4,
+    authority_check:    5,
+    feature_extraction: 6,
+    verification:       7,
+    scoring:            8,
+    synthesis:          9,
+};
 
 const PipelineContext = createContext(null);
 
 export function PipelineProvider({ children }) {
     const { settings } = useSettings();
+    const { addNotification } = useNotifications();
 
     // ── Core execution state ─────────────────────────────────────
     const [company, setCompany] = useState('');
@@ -18,53 +34,46 @@ export function PipelineProvider({ children }) {
     const [result, setResult] = useState(null);
     const [error, setError] = useState('');
 
-    // ── Pipeline animation state (preserved across tab switches) ─
-    const [activeStage, setActiveStage] = useState(0);
+    // ── Pipeline animation state (driven by SSE now) ─────────────
+    const [activeStage, setActiveStage] = useState(-1);
+    const [completedStages, setCompletedStages] = useState(new Set());
+    const [stageLatencies, setStageLatencies] = useState({});
     const [elapsed, setElapsed] = useState(0);
 
-    // ── Refs (not serialisable, but survive re-renders) ──────────
+    // ── Refs ──────────────────────────────────────────────────────
     const abortControllerRef = useRef(null);
-    const stageTimerRef = useRef(null);
     const clockTimerRef = useRef(null);
 
-    // ── Internal: start / stop the animation clocks ──────────────
-    const startClocks = useCallback(() => {
-        // Guard: don't double-start
-        if (stageTimerRef.current) return;
-
-        stageTimerRef.current = setInterval(() => {
-            setActiveStage(prev =>
-                prev < 10 ? prev + 1 : prev   // 11 stages → index 0-10
-            );
-        }, 5000);
-
+    // ── Internal: start / stop the elapsed clock ─────────────────
+    const startClock = useCallback(() => {
+        if (clockTimerRef.current) return;
         clockTimerRef.current = setInterval(() => {
             setElapsed(prev => prev + 1);
         }, 1000);
     }, []);
 
-    const stopClocks = useCallback(() => {
-        clearInterval(stageTimerRef.current);
+    const stopClock = useCallback(() => {
         clearInterval(clockTimerRef.current);
-        stageTimerRef.current = null;
         clockTimerRef.current = null;
     }, []);
 
-    // ── Public: execute the pipeline ─────────────────────────────
+    // ── Public: execute the pipeline with SSE streaming ──────────
     const executePipeline = useCallback(async (companyName) => {
         if (!companyName.trim()) return;
 
         // Reset everything for a fresh run
-        stopClocks();
+        stopClock();
         setLoading(true);
         setError('');
         setResult(null);
-        setActiveStage(0);
+        setActiveStage(-1);
+        setCompletedStages(new Set());
+        setStageLatencies({});
         setElapsed(0);
         setCompany(companyName.trim());
 
         abortControllerRef.current = new AbortController();
-        startClocks();
+        startClock();
 
         try {
 
@@ -154,15 +163,17 @@ export function PipelineProvider({ children }) {
 
     // ── Public: clear results to start fresh ─────────────────────
     const clearPipeline = useCallback(() => {
-        stopClocks();
+        stopClock();
         stopPipeline();
         setLoading(false);
         setResult(null);
         setError('');
-        setActiveStage(0);
+        setActiveStage(-1);
+        setCompletedStages(new Set());
+        setStageLatencies({});
         setElapsed(0);
         setCompany('');
-    }, [stopClocks, stopPipeline]);
+    }, [stopClock, stopPipeline]);
 
     return (
         <PipelineContext.Provider value={{
@@ -173,6 +184,8 @@ export function PipelineProvider({ children }) {
             result,
             error,
             activeStage,
+            completedStages,
+            stageLatencies,
             elapsed,
             // Actions
             executePipeline,
