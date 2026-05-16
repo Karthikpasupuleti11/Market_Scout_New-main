@@ -32,7 +32,7 @@ Text:
 {text[:1200]}
 """
 
-    raw_response = await invoke_llm(
+    raw_response = invoke_llm(
         [{"role": "user", "content": prompt}],
         temperature=0.0,
         max_tokens=50,

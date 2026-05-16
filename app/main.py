@@ -420,11 +420,11 @@ async def run_agent_stream(request: AgentRequest):
         ACTIVE_PIPELINES.inc()
         try:
             graph = app.state.graph
-            result = graph.invoke({
+            result = asyncio.run(graph.ainvoke({
                 "company_name": request.company_name,
                 "date_window_days": request.date_window_days,
                 "_progress_callback": progress_callback,
-            })
+            }))
 
             report = result.get("synthesis_report", {})
             if not report:

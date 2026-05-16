@@ -140,7 +140,7 @@ User question: {query}"""
 ]
 
     try:
-        response = await invoke_llm(messages)
+        response = invoke_llm(messages)
     except Exception as e:
         print("LLM ERROR:", e)
 

@@ -4,6 +4,7 @@ Market Intelligence Scout — Scheduled Job Runner
 Executes in a background thread when APScheduler fires a job.
 """
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 
@@ -31,7 +32,7 @@ def run_scheduled_job(job_id: int, company_name: str, email: str, db_factory, gr
                     job_id, company_name, email)
 
         # ── 2. Run pipeline ──────────────────────────────────────────
-        result = graph.invoke({"company_name": company_name})
+        result = asyncio.run(graph.ainvoke({"company_name": company_name}))
         report = result.get("synthesis_report", {})
 
         if not report:

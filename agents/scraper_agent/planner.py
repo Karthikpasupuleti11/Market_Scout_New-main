@@ -29,7 +29,7 @@ Format:
 {{ "order": ["beautifulsoup", "newspaper3k", "playwright"] }}
 """
 
-    raw = await invoke_llm(
+    raw = invoke_llm(
         messages=[{"role": "user", "content": prompt}],
         temperature=0.0,
         max_tokens=100,

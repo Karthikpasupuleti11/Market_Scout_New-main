@@ -36,7 +36,7 @@ import inspect
 
 
 def _instrument_node(name: str, fn):
-    def wrapper(state: GraphState) -> Dict[str, Any]:
+    async def wrapper(state: GraphState) -> Dict[str, Any]:
         # ── Emit progress event (if a callback is attached) ───────
         progress_cb = state.get("_progress_callback")
         if progress_cb:
@@ -48,7 +48,10 @@ def _instrument_node(name: str, fn):
         start = time.time()
 
         try:
-            result = fn(state)
+            if inspect.iscoroutinefunction(fn):
+                result = await fn(state)
+            else:
+                result = fn(state)
 
             NODE_SUCCESS.labels(
                 node_name=name,

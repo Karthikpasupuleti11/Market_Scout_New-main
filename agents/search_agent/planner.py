@@ -69,7 +69,7 @@ Output format:
         prompt += f"\n\nFeedback from previous iteration (previous queries returned no results):\n{feedback}\nTry completely different query angles.\n"
 
     # 1️⃣ LLM call (always returns STRING)
-    raw_response = await invoke_llm(
+    raw_response = invoke_llm(
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,
         max_tokens=400,

@@ -164,7 +164,7 @@ CONSTRAINTS:
 Return ONLY the JSON. No preamble."""
 
     try:
-        response = await invoke_llm(
+        response = invoke_llm(
             [system_message, {"role": "user", "content": user_prompt}],
             temperature=0.1,
             max_tokens=settings.LLM_MAX_TOKENS,

@@ -117,7 +117,7 @@ Respond with ONLY one word: SAFE or UNSAFE."""
         {"role": "user", "content": prompt},
     ]
 
-    response = await invoke_llm(messages, temperature=0.0, max_tokens=10)
+    response = invoke_llm(messages, temperature=0.0, max_tokens=10)
 
     if "UNSAFE" in response.upper():
         logger.warning("GUARDRAIL — Semantic check flagged input as UNSAFE: '%s'", name)
