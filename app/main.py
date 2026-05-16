@@ -288,13 +288,18 @@ async def run_agent(request: AgentRequest):
 @app.get("/task-status/{task_id}", tags=["Intelligence"], summary="Poll Celery Task")
 def task_status(task_id: str):
     """Return Celery task status and result (when ready)."""
-    res = AsyncResult(task_id)
-    payload = {"task_id": task_id, "status": res.status}
-    if res.successful():
-        payload["result"] = res.result
-    elif res.failed():
-        payload["error"] = str(res.result)
-    return payload
+    from app.celery_app import celery
+    try:
+        res = AsyncResult(task_id, app=celery)
+        payload = {"task_id": task_id, "status": res.status}
+        if res.successful():
+            payload["result"] = res.result
+        elif res.failed():
+            payload["error"] = str(res.result)
+        return payload
+    except Exception as exc:
+        logger.error("API — task-status error for %s: %s", task_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"task-status error: {exc}")
 
 
 # ────────────────────────────────────────────────────────────────────
