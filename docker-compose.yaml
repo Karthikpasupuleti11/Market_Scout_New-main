@@ -14,7 +14,7 @@ services:
       - REDIS_PORT=6379
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
-      - ENABLE_SCHEDULER=False
+      - ENABLE_SCHEDULER=False     # standalone scheduler service owns it
     depends_on:
       postgres:
         condition: service_healthy
@@ -24,7 +24,7 @@ services:
     networks:
       - scout_net
 
-  # ── Scheduler — single APScheduler process, dispatches to Celery ──
+  # ── Standalone APScheduler ─────────────────────────────────────
   scheduler:
     build: .
     container_name: market_scheduler
@@ -41,8 +41,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      celery_worker:
-        condition: service_started
     restart: unless-stopped
     networks:
       - scout_net
@@ -80,7 +78,7 @@ services:
     networks:
       - scout_net
 
-  # ── Celery Worker — maintenance queue (light, fast) ───────────
+  # ── Celery Worker — maintenance queue (light) ─────────────────
   celery_worker_maint:
     build: .
     container_name: market_celery_worker_maint
@@ -106,7 +104,7 @@ services:
     networks:
       - scout_net
 
-  # ── Celery Beat — periodic task scheduler ─────────────────────
+  # ── Celery Beat — periodic task dispatcher ────────────────────
   celery_beat:
     build: .
     container_name: market_celery_beat
@@ -206,26 +204,25 @@ services:
       - scout_net
 
   # ── Grafana ────────────────────────────────────────────────────
-  grafana:
-    image: grafana/grafana:latest
-    container_name: market_grafana
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    depends_on:
-      - prometheus
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-    networks:
-      - scout_net
+  azureuser@marketscout:~/Market_Scout_New-main$ curl -i -N \
+  -H "Connection: Upgrade" -H "Upgrade: websocket" \
+  -H "Sec-WebSocket-Version: 13" \
+  -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
+  -H "Origin: https://grafana.market-scout.me" \
+  https://grafana.market-scout.me/api/live/ws
+HTTP/1.1 401 Unauthorized
+Server: nginx/1.24.0 (Ubuntu)
+Date: Sat, 16 May 2026 19:39:18 GMT
+Content-Type: application/json; charset=UTF-8
+Content-Length: 102
+Connection: keep-alive
+Cache-Control: no-store
+X-Content-Type-Options: nosniff
+X-Frame-Options: deny
+X-Xss-Protection: 1; mode=block
+
+{"extra":null,"message":"Unauthorized","messageId":"auth.unauthorized","statusCode":401,"traceID":""}
+azureuser@marketscout:~/Market_Scout_New-main$ 
 
 volumes:
   postgres_data:
