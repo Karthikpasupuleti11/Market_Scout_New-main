@@ -163,21 +163,13 @@ def invoke_llm(
 
         try:
 
-            async with LLM_SEMAPHORE:
-
-                response = await asyncio.to_thread(
-                    client.chat.completions.create,
-
-                    model=settings.LLM_MODEL,
-
-                    messages=messages,
-
-                    temperature=temperature,
-
-                    max_tokens=max_tokens,
-
-                    top_p=settings.LLM_TOP_P,
-                )
+            response = client.chat.completions.create(
+                model=settings.LLM_MODEL,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                top_p=settings.LLM_TOP_P,
+            )
 
             duration = time.time() - start_time
 
@@ -229,7 +221,7 @@ def invoke_llm(
             )
 
             if attempt < retries:
-                await asyncio.sleep(wait)
+                time.sleep(wait)
 
     LLM_CALL_COUNT.labels(agent_name=agent_name, status="failure").inc()
     raise RuntimeError(
