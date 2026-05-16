@@ -18,7 +18,7 @@ from llm.nvidia_client import invoke_llm
 logger = logging.getLogger(__name__)
 
 
-def authority_check_node(state: GraphState) -> Dict[str, Any]:
+async def authority_check_node(state: GraphState) -> Dict[str, Any]:
     """
     Authority Check — classify article source credibility.
 
@@ -64,7 +64,7 @@ Respond with ONLY one word: PRIMARY or SECONDARY"""
         ]
 
         try:
-            response = invoke_llm(messages, temperature=0.0, max_tokens=10)
+            response = await invoke_llm(messages, temperature=0.0, max_tokens=10)
             decision = response.strip().upper()
 
             if "PRIMARY" in decision:

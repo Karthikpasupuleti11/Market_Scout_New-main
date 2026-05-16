@@ -51,7 +51,7 @@ def _clean_json_response(raw: str) -> str:
 # Node Entry Point
 # ────────────────────────────────────────────────────────────────────
 
-def synthesis_node(state: GraphState) -> Dict[str, Any]:
+async def synthesis_node(state: GraphState) -> Dict[str, Any]:
     """
     Synthesis Agent — generates executive-ready intelligence report.
 
@@ -164,7 +164,7 @@ CONSTRAINTS:
 Return ONLY the JSON. No preamble."""
 
     try:
-        response = invoke_llm(
+        response = await invoke_llm(
             [system_message, {"role": "user", "content": user_prompt}],
             temperature=0.1,
             max_tokens=settings.LLM_MAX_TOKENS,

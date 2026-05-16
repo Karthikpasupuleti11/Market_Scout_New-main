@@ -8,7 +8,7 @@ from llm.nvidia_client import invoke_llm
 logger = logging.getLogger(__name__)
 
 
-def plan_queries(
+async def plan_queries(
     company: str,
     feedback: Optional[str] = None,
     memory: Optional[Dict[str, Any]] = None,
@@ -69,7 +69,7 @@ Output format:
         prompt += f"\n\nFeedback from previous iteration (previous queries returned no results):\n{feedback}\nTry completely different query angles.\n"
 
     # 1️⃣ LLM call (always returns STRING)
-    raw_response = invoke_llm(
+    raw_response = await invoke_llm(
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,
         max_tokens=400,

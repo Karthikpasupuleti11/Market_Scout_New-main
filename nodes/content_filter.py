@@ -18,7 +18,7 @@ from llm.nvidia_client import invoke_llm
 logger = logging.getLogger(__name__)
 
 
-def content_filter_node(state: GraphState) -> Dict[str, Any]:
+async def content_filter_node(state: GraphState) -> Dict[str, Any]:
     """
     Content Filter — semantic classification of article intent.
 
@@ -73,7 +73,7 @@ Respond with ONLY one word: ACCEPT or REJECT"""
         ]
 
         try:
-            response = invoke_llm(messages, temperature=0.0, max_tokens=10)
+            response = await invoke_llm(messages, temperature=0.0, max_tokens=10)
             decision = response.strip().upper()
 
             if "ACCEPT" in decision:

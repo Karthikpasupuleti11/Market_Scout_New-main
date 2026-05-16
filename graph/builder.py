@@ -32,20 +32,49 @@ logger = logging.getLogger(__name__)
 # Node Instrumentation Wrapper
 # ────────────────────────────────────────────────────────────────────
 
+import inspect
+
+
 def _instrument_node(name: str, fn):
-    def wrapper(state: GraphState) -> Dict[str, Any]:
+
+    async def wrapper(state: GraphState) -> Dict[str, Any]:
+
         start = time.time()
+
         try:
-            result = fn(state)
-            NODE_SUCCESS.labels(node_name=name, status="success").inc()
+
+            # ── Handle async nodes ─────────────────────
+            if inspect.iscoroutinefunction(fn):
+                result = await fn(state)
+
+            # ── Handle sync nodes ──────────────────────
+            else:
+                result = fn(state)
+
+            NODE_SUCCESS.labels(
+                node_name=name,
+                status="success"
+            ).inc()
+
             return result
+
         except Exception:
-            NODE_SUCCESS.labels(node_name=name, status="failure").inc()
+
+            NODE_SUCCESS.labels(
+                node_name=name,
+                status="failure"
+            ).inc()
+
             raise
+
         finally:
-            NODE_LATENCY.labels(node_name=name).observe(time.time() - start)
+
+            NODE_LATENCY.labels(
+                node_name=name
+            ).observe(time.time() - start)
 
     wrapper.__name__ = fn.__name__
+
     return wrapper
 
 

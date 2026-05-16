@@ -8,10 +8,10 @@ router = APIRouter(prefix="/rag", tags=["RAG"])
 
 @router.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
-    process_pdf(file.file)
+    await process_pdf(file.file)
     return {"message": "PDF processed successfully"}
 
 
 @router.get("/ask")
-def ask(query: str):
-    return ask_question(query)
+async def ask(query: str):
+    return await ask_question(query)

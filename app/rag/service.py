@@ -9,7 +9,7 @@ from cache.redis_client import get_redis
 REDIS_KEY = "rag_index"
 
 
-def process_pdf(file):
+async def process_pdf(file):
     pages = load_pdf(file)
 
     all_chunks = []
@@ -44,7 +44,7 @@ def load_store():
     return store
 
 
-def ask_question(query: str):
+async def ask_question(query: str):
     store = load_store()
     if not store:
         return {"answer": "No document uploaded.", "sources": []}
@@ -82,7 +82,7 @@ Please answer based on the above context."""
 ]
 
     try:
-        response = invoke_llm(messages)
+        response = await invoke_llm(messages)
     except Exception as e:
         print("LLM ERROR:", e)
 

@@ -95,7 +95,7 @@ def _check_rate_limit(identifier: str) -> None:
 # Semantic Safety Net (LLM-based — last resort)
 # ────────────────────────────────────────────────────────────────────
 
-def _check_semantic_intent(name: str) -> None:
+async def _check_semantic_intent(name: str) -> None:
     """Use LLM to detect prompt injection / jailbreak attempts
     that slip past deterministic checks."""
     prompt = f"""You are a security classifier for a Market Intelligence tool that searches for company news.
@@ -117,7 +117,7 @@ Respond with ONLY one word: SAFE or UNSAFE."""
         {"role": "user", "content": prompt},
     ]
 
-    response = invoke_llm(messages, temperature=0.0, max_tokens=10)
+    response = await invoke_llm(messages, temperature=0.0, max_tokens=10)
 
     if "UNSAFE" in response.upper():
         logger.warning("GUARDRAIL — Semantic check flagged input as UNSAFE: '%s'", name)
@@ -130,7 +130,7 @@ Respond with ONLY one word: SAFE or UNSAFE."""
 # Node Entry Point
 # ────────────────────────────────────────────────────────────────────
 
-def guardrails_node(state: GraphState) -> Dict[str, Any]:
+async def guardrails_node(state: GraphState) -> Dict[str, Any]:
     """
     Pre-flight security node. Runs before any agent in the pipeline.
 
@@ -159,7 +159,7 @@ def guardrails_node(state: GraphState) -> Dict[str, Any]:
         _check_rate_limit(company_name)
 
         # 6. Semantic check (slow, last resort)
-        _check_semantic_intent(company_name)
+        await _check_semantic_intent(company_name)
 
     except ValueError as exc:
         logger.warning("GUARDRAIL BLOCKED — %s", exc)

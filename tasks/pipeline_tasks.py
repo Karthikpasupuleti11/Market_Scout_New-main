@@ -1,3 +1,5 @@
+import asyncio
+
 from app.celery_app import celery
 from graph.builder import build_graph
 from database.session import get_db
@@ -14,10 +16,12 @@ graph = build_graph()
 @celery.task(bind=True)
 def run_market_pipeline(self, company_name, date_window_days):
 
-    result = graph.invoke({
-        "company_name": company_name,
-        "date_window_days": date_window_days,
-    })
+    result = asyncio.run (
+        graph.ainvoke({
+            "company_name": company_name,
+            "date_window_days": date_window_days,
+        })
+    )
 
     report = result.get("synthesis_report", {})
 

@@ -44,7 +44,7 @@ def _clean_json_response(raw: str) -> str:
 # Node Entry Point
 # ────────────────────────────────────────────────────────────────────
 
-def feature_extraction_node(state: GraphState) -> Dict[str, Any]:
+async def feature_extraction_node(state: GraphState) -> Dict[str, Any]:
     """
     Feature Extraction Agent — extracts structured technical features.
 
@@ -129,7 +129,7 @@ CONSTRAINTS:
 Return ONLY the JSON list. No preamble, no explanation."""
 
         try:
-            response = invoke_llm(
+            response = await invoke_llm(
                 [system_message, {"role": "user", "content": user_prompt}],
                 temperature=0.0,
                 max_tokens=settings_max_tokens(),

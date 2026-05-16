@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 MAX_AGENT_LOOPS = 2
 
 
-def search_agent_node(state: GraphState) -> Dict[str, Any]:
+async def search_agent_node(state: GraphState) -> Dict[str, Any]:
     start_time = time.time()
     company = state["company_name"]
 
@@ -30,7 +30,7 @@ def search_agent_node(state: GraphState) -> Dict[str, Any]:
     for iteration in range(1, MAX_AGENT_LOOPS + 1):
         logger.info("SEARCH AGENT — Iteration %d", iteration)
 
-        queries = plan_queries(
+        queries = await plan_queries(
             company,
             feedback=last_results,
             memory=memory,

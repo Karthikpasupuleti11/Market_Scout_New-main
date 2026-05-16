@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 MAX_FAILURES = 3
 DEFAULT_ORDER = ["beautifulsoup", "newspaper3k", "playwright"]
 
-def decide_strategy(url: str) -> list[str]:
+async def decide_strategy(url: str) -> list[str]:
     prompt = f"""
 You are a scraping strategy planner.
 
@@ -29,7 +29,7 @@ Format:
 {{ "order": ["beautifulsoup", "newspaper3k", "playwright"] }}
 """
 
-    raw = invoke_llm(
+    raw = await invoke_llm(
         messages=[{"role": "user", "content": prompt}],
         temperature=0.0,
         max_tokens=100,

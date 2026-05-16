@@ -1,8 +1,10 @@
 from typing import Dict, Any, List
+import traceback
 from graph.state import GraphState
 import time
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import asyncio
 
 from .memory import get_article, save_article, load_agent_memory, save_agent_memory
 from .planner import decide_strategy
@@ -22,7 +24,7 @@ MAX_FAILURES_PER_URL = 3
 MAX_WORKERS = 10
 
 
-def process_single_url(item, company):
+async def process_single_url(item, company):
     url = item["url"]
     failures = 0
 
@@ -34,7 +36,7 @@ def process_single_url(item, company):
         logger.info("SCRAPER — Cache hit | %s", url)
         return cached
 
-    strategies = decide_strategy(url)
+    strategies = await decide_strategy(url)
     result = None
 
     # ── Try strategies ─────────────────────────
@@ -68,7 +70,7 @@ def process_single_url(item, company):
         return None
 
     # ── Critic ─────────────────────────────────
-    technical = is_technical(result["text"])
+    technical = await is_technical(result["text"])
 
     logger.info("SCRAPER — Critic decision | Technical: %s", technical)
 
@@ -90,7 +92,8 @@ def process_single_url(item, company):
     return article
 
 
-def scraper_agent_node(state: GraphState) -> Dict[str, Any]:
+async def scraper_agent_node(state: GraphState) -> Dict[str, Any]:
+
     start_time = time.time()
 
     urls = state.get("search_results", [])
@@ -103,20 +106,30 @@ def scraper_agent_node(state: GraphState) -> Dict[str, Any]:
     )
 
     memory = load_agent_memory(company)
-    scraped: List[Dict[str, Any]] = []
 
-    # 🚀 Parallel scraping
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+    # 🚀 TRUE ASYNC PARALLEL SCRAPING
+    tasks = [
+        process_single_url(item, company)
+        for item in urls
+    ]
 
-        futures = [
-            executor.submit(process_single_url, item, company)
-            for item in urls
-        ]
+    results = await asyncio.gather(
+        *tasks,
+        return_exceptions=True
+    )
 
-        for future in as_completed(futures):
-            result = future.result()
-            if result:
-                scraped.append(result)
+    scraped = []
+
+    for result in results:
+
+        if isinstance(result, Exception):
+            # Log the exception type/message and full traceback to diagnose formatting errors
+            logger.warning("SCRAPER — Task failed | %s", repr(result))
+            logger.debug("SCRAPER — Traceback:\n%s", "".join(traceback.format_exception(type(result), result, result.__traceback__)))
+            continue
+
+        if result:
+            scraped.append(result)
 
     save_agent_memory(company, memory)
 
@@ -126,4 +139,6 @@ def scraper_agent_node(state: GraphState) -> Dict[str, Any]:
         time.time() - start_time,
     )
 
-    return {"scraped_articles": scraped}
+    return {
+        "scraped_articles": scraped
+    }

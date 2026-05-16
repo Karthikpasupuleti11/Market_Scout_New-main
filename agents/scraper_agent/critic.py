@@ -2,19 +2,20 @@ import json
 from llm.nvidia_client import invoke_llm
 
 
-def is_technical(text: str) -> bool:
+async def is_technical(text: str) -> bool:
+
     prompt = f"""
 Determine if this content contains REAL technical updates
 (APIs, SDKs, infra, models, releases).
 
 Respond ONLY in valid JSON:
-{{ "technical": true or false }}
+{{ "technical": true }}
 
 Text:
 {text[:1200]}
 """
 
-    raw_response = invoke_llm(
+    raw_response = await invoke_llm(
         [{"role": "user", "content": prompt}],
         temperature=0.0,
         max_tokens=50,
@@ -26,8 +27,10 @@ Text:
             parsed = json.loads(raw_response)
         except json.JSONDecodeError:
             return False
+
     elif isinstance(raw_response, dict):
         parsed = raw_response
+
     else:
         return False
 
