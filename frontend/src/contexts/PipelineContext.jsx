@@ -1,7 +1,7 @@
-import { createContext, useContext, useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { runPipeline, getTaskStatus } from '../api';
 import { useSettings } from './SettingsContext';
-import { useNotifications } from './NotificationContext';
+import { PipelineContext } from './pipeline-context';
 
 /* ═══════════════════════════════════════════════════════════════════
    PIPELINE CONTEXT — Real-time SSE-powered pipeline execution.
@@ -22,11 +22,8 @@ const NODE_TO_STAGE = {
     synthesis:          9,
 };
 
-const PipelineContext = createContext(null);
-
 export function PipelineProvider({ children }) {
     const { settings } = useSettings();
-    const { addNotification } = useNotifications();
 
     // ── Core execution state ─────────────────────────────────────
     const [company, setCompany] = useState('');
@@ -103,7 +100,7 @@ export function PipelineProvider({ children }) {
 
                 clearInterval(pollInterval);
 
-                stopClocks();
+                stopClock();
 
                 setLoading(false);
             }
@@ -115,7 +112,7 @@ export function PipelineProvider({ children }) {
 
                 clearInterval(pollInterval);
 
-                stopClocks();
+                stopClock();
 
                 setLoading(false);
             }
@@ -128,7 +125,7 @@ export function PipelineProvider({ children }) {
 
             clearInterval(pollInterval);
 
-            stopClocks();
+            stopClock();
 
             setLoading(false);
         }
@@ -148,11 +145,11 @@ export function PipelineProvider({ children }) {
         );
     }
 
-    stopClocks();
+    stopClock();
 
     setLoading(false);
 }
-    }, [settings.analysis.timeWindow, startClocks, stopClocks]);
+    }, [settings.analysis.timeWindow, startClock, stopClock]);
 
     // ── Public: stop the running pipeline ────────────────────────
     const stopPipeline = useCallback(() => {
@@ -197,8 +194,3 @@ export function PipelineProvider({ children }) {
     );
 }
 
-export function usePipeline() {
-    const ctx = useContext(PipelineContext);
-    if (!ctx) throw new Error('usePipeline must be inside <PipelineProvider>');
-    return ctx;
-}

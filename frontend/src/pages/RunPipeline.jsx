@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useSettings } from '../contexts/SettingsContext';
-import { usePipeline } from '../contexts/PipelineContext';   // ← NEW
+import { usePipeline } from '../contexts/usePipeline';
 import {
     HiOutlineLightningBolt,
     HiOutlineExternalLink,
