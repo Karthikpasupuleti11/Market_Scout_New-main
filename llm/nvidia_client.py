@@ -15,6 +15,7 @@ import logging
 import time
 import threading
 import asyncio
+from weakref import WeakKeyDictionary
 
 from itertools import cycle
 from typing import List, Dict, Optional
@@ -62,10 +63,10 @@ _key_lock = threading.Lock()
 # }
 _cooldown_keys = {}
 
-# Concurrency limiter
+# Per-event-loop concurrency limiter
 # IMPORTANT:
-# Prevents massive parallel LLM flooding
-LLM_SEMAPHORE = asyncio.Semaphore(3)
+# Avoid binding an asyncio.Semaphore to a different event loop
+_loop_semaphores = WeakKeyDictionary()
 
 # Cache clients per key
 _clients = {}
@@ -85,6 +86,15 @@ def _get_client(api_key: str) -> OpenAI:
 
     return _clients[api_key]
 
+def _get_loop_semaphore() -> asyncio.Semaphore:
+    loop = asyncio.get_running_loop()
+    sem = _loop_semaphores.get(loop)
+
+    if sem is None:
+        sem = asyncio.Semaphore(3)
+        _loop_semaphores[loop] = sem
+
+    return sem
 
 # ─────────────────────────────────────────────────────────────
 # API KEY MANAGEMENT
@@ -196,7 +206,7 @@ async def invoke_llm(
 
         try:
 
-            async with LLM_SEMAPHORE:
+            async with _get_loop_semaphore():
 
                 response = await asyncio.to_thread(
                     client.chat.completions.create,
@@ -325,7 +335,7 @@ async def invoke_llm_with_tools(
 
     client = _get_client(api_key)
 
-    async with LLM_SEMAPHORE:
+    async with _get_loop_semaphore():
 
         response = await asyncio.to_thread(
 
