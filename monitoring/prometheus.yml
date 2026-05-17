@@ -6,10 +6,10 @@ scrape_configs:
   - job_name: "market-scout"
     metrics_path: "/metrics"
     static_configs:
-      - targets: ["metrics.market-scout.me"]
+      - targets: ["host.docker.internal:8000"]
         labels:
           service: "market-intelligence-scout"
-          environment: "production"
+          environment: "development"
 
   - job_name: "flower"
     metrics_path: "/metrics"
@@ -17,4 +17,4 @@ scrape_configs:
       - targets: ["flower:5555"]
         labels:
           service: "celery-flower"
-          environment: "production"
+          environment: "development"

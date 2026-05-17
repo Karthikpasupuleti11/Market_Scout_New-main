@@ -348,6 +348,9 @@ async def run_agent(request: AgentRequest):
         date_window_days=request.date_window_days,
     )
 
+    # Track active pipeline in FastAPI's Prometheus registry
+    ACTIVE_PIPELINES.inc()
+
     return {
         "task_id": task.id,
         "status": "PENDING",
@@ -363,6 +366,8 @@ class TaskStatusResponse(BaseModel):
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
 
+# Track task_ids that have already had metrics recorded to prevent double-counting
+_metrics_recorded_tasks: set = set()
 
 @app.get(
     "/task/{task_id}",
@@ -384,8 +389,51 @@ async def get_task_status(task_id: str):
         response["progress"] = result.info or {}
     elif result.status == "SUCCESS":
         response["result"] = result.result
+
+        # ── Record metrics in FastAPI's registry (only once per task) ──
+        if task_id not in _metrics_recorded_tasks:
+            _metrics_recorded_tasks.add(task_id)
+            ACTIVE_PIPELINES.dec()  # Pipeline finished — decrement gauge
+            try:
+                report = result.result or {}
+                features = report.get("features", [])
+                error_msg = report.get("metadata", {}).get("error") if isinstance(report.get("metadata"), dict) else None
+                company = report.get("company_name", "unknown")
+
+                if error_msg and not features:
+                    PIPELINE_RUNS.labels(status="error").inc()
+                else:
+                    PIPELINE_RUNS.labels(status="completed").inc()
+
+                for f in features:
+                    if isinstance(f, dict):
+                        cat = f.get("category", "unknown")
+                        FEATURES_EXTRACTED.labels(company=company, category=cat).inc()
+                        score = f.get("confidence_score", 0) or 0
+                        CONFIDENCE_SCORE.observe(score)
+
+                verified_count = report.get("total_features_verified", 0) or len(features)
+                FEATURES_VERIFIED.labels(company=company).inc(verified_count)
+                SOURCES_ANALYSED.observe(report.get("total_sources_analysed", 0))
+
+                logger.info("METRICS — Recorded: company=%s, features=%d, verified=%d, sources=%d",
+                    company, len(features), verified_count, report.get("total_sources_analysed", 0))
+            except Exception as exc:
+                logger.debug("Metric recording failed (non-fatal): %s", exc)
+
+            # Prevent the set from growing forever
+            if len(_metrics_recorded_tasks) > 500:
+                _metrics_recorded_tasks.clear()
+
     elif result.status == "FAILURE":
         response["error"] = str(result.result) if result.result else "Task failed"
+
+        # Record failure metric (only once per task)
+        if task_id not in _metrics_recorded_tasks:
+            _metrics_recorded_tasks.add(task_id)
+            ACTIVE_PIPELINES.dec()  # Pipeline finished — decrement gauge
+            PIPELINE_RUNS.labels(status="error").inc()
+
     elif result.status == "RETRY":
         response["progress"] = {"message": "Task is being retried"}
 
