@@ -136,9 +136,8 @@ services:
     build: .
     container_name: market_flower
     command: >
-      celery -A app.celery_app flower
+      celery -A app.celery_app --broker=redis://redis:6379/0 flower
       --port=5555
-      --broker=redis://redis:6379/0
       --basic_auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-admin}
     ports:
       - "5555:5555"
