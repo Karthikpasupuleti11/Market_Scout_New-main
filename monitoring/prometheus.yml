@@ -10,3 +10,12 @@ scrape_configs:
         labels:
           service: "market-intelligence-scout"
           environment: "production"
+
+  - job_name: "market-scout-worker"
+    metrics_path: "/"
+    static_configs:
+      - targets: ["market_celery_worker:8001"]
+        labels:
+          service: "market-intelligence-scout"
+          component: "celery_worker"
+          environment: "production"
