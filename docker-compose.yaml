@@ -53,7 +53,7 @@ services:
       celery -A app.celery_app worker
       --loglevel=info
       --pool=threads
-      --concurrency=2
+      --concurrency=${CELERY_PIPELINE_CONCURRENCY:-8}
       --queues=pipeline,scheduled
       --hostname=worker.pipeline@%h
     env_file: .env

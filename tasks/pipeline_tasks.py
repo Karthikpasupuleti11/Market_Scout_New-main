@@ -19,9 +19,10 @@ Conventions:
 from __future__ import annotations
 
 import asyncio
+import json as _json
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from celery.exceptions import SoftTimeLimitExceeded
 
@@ -40,6 +41,41 @@ from observability.metrics import (
 from utils.feature_utils import _safe_feature
 
 logger = logging.getLogger(__name__)
+
+
+# ── Streaming bridge (Celery task → SSE endpoint via Redis list) ───────
+_STREAM_KEY_FMT = "pipeline:events:{stream_id}"
+_STREAM_TTL_SECONDS = 3600
+
+
+def _make_stream_publisher(stream_id: str):
+    """Return (publish_event, progress_callback) bound to a Redis list.
+
+    publish_event(dict) — push a structured event (started/complete/error).
+    progress_callback(node, status, elapsed) — graph-node progress signal.
+
+    Failures are swallowed: a broken stream must not kill the pipeline.
+    """
+    from cache.redis_client import get_redis
+    r = get_redis()
+    key = _STREAM_KEY_FMT.format(stream_id=stream_id)
+
+    def publish_event(event: Dict[str, Any]) -> None:
+        try:
+            r.lpush(key, _json.dumps(event, default=str))
+            r.expire(key, _STREAM_TTL_SECONDS)
+        except Exception as exc:
+            logger.debug("STREAM publish failed (stream=%s): %s", stream_id, exc)
+
+    def progress_callback(node_name: str, status: str, elapsed: float = 0) -> None:
+        publish_event({
+            "event": "node_progress",
+            "node": node_name,
+            "status": status,
+            "elapsed": round(elapsed, 2),
+        })
+
+    return publish_event, progress_callback
 
 
 # ── Graph singleton (per worker process) ───────────────────────────────
@@ -122,11 +158,31 @@ def _record_metrics(report: Dict[str, Any], company_name: str, error: str | None
     max_retries=3,
     acks_late=True,
 )
-def run_market_pipeline(self, company_name: str, date_window_days: int) -> Dict[str, Any]:
-    """Run the LangGraph intelligence pipeline and persist + return the report."""
+def run_market_pipeline(
+    self,
+    company_name: str,
+    date_window_days: int,
+    stream_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Run the LangGraph intelligence pipeline and persist + return the report.
+
+    If *stream_id* is provided, publish progress + terminal events to the
+    Redis list `pipeline:events:{stream_id}` so an SSE endpoint can stream
+    them back to the caller.
+    """
     task_id = self.request.id
-    logger.info("PIPELINE — START | task=%s | company=%s | window=%s",
-                task_id, company_name, date_window_days)
+    logger.info("PIPELINE — START | task=%s | company=%s | window=%s | stream=%s",
+                task_id, company_name, date_window_days, stream_id)
+
+    publish_event = None
+    progress_callback = None
+    if stream_id:
+        publish_event, progress_callback = _make_stream_publisher(stream_id)
+        publish_event({
+            "event": "started",
+            "task_id": task_id,
+            "company_name": company_name,
+        })
 
     ACTIVE_PIPELINES.inc()
     self.update_state(state="PROGRESS",
@@ -134,26 +190,33 @@ def run_market_pipeline(self, company_name: str, date_window_days: int) -> Dict[
 
     try:
         graph = _get_graph()
+        invoke_state: Dict[str, Any] = {
+            "company_name": company_name,
+            "date_window_days": date_window_days,
+        }
+        if progress_callback is not None:
+            invoke_state["_progress_callback"] = progress_callback
+
         try:
-            result = asyncio.run(graph.ainvoke({
-                "company_name": company_name,
-                "date_window_days": date_window_days,
-            }))
+            result = asyncio.run(graph.ainvoke(invoke_state))
         except SoftTimeLimitExceeded:
             logger.error("PIPELINE — soft time limit hit | task=%s | company=%s",
                          task_id, company_name)
             PIPELINE_RUNS.labels(status="error").inc()
+            if publish_event:
+                publish_event({"event": "error", "detail": "soft time limit exceeded"})
             raise
 
         report = result.get("synthesis_report", {}) or {}
         if not report:
             PIPELINE_RUNS.labels(status="error").inc()
+            if publish_event:
+                publish_event({"event": "error", "detail": "Pipeline produced no report."})
             raise RuntimeError("Pipeline produced no synthesis report.")
 
         error = result.get("error") or report.get("metadata", {}).get("error")
         _record_metrics(report, company_name, error)
 
-        # Persist
         db = SessionLocal()
         try:
             crud.save_report(db, company_name, report)
@@ -167,8 +230,14 @@ def run_market_pipeline(self, company_name: str, date_window_days: int) -> Dict[
         logger.info("PIPELINE — DONE | task=%s | features=%d | sources=%d",
                     task_id, len(response["features"]),
                     response["total_sources_analysed"])
+        if publish_event:
+            publish_event({"event": "complete", "data": response})
         return response
 
+    except Exception as exc:
+        if publish_event:
+            publish_event({"event": "error", "detail": str(exc)[:500]})
+        raise
     finally:
         ACTIVE_PIPELINES.dec()
 

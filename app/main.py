@@ -39,12 +39,6 @@ from scheduler import scheduler
 from observability.metrics import (
     REQUEST_COUNT,
     REQUEST_LATENCY,
-    PIPELINE_RUNS,
-    ACTIVE_PIPELINES,
-    FEATURES_EXTRACTED,
-    FEATURES_VERIFIED,
-    CONFIDENCE_SCORE,
-    SOURCES_ANALYSED,
 )
 
 from app.api_models import (
@@ -53,7 +47,6 @@ from app.api_models import (
     FeatureItem,
     HealthResponse
 )
-from utils.feature_utils import _safe_feature
 
 # ────────────────────────────────────────────────────────────────────
 # Logging Configuration
@@ -269,18 +262,11 @@ def dashboard_stats(db: Session = Depends(get_db)):
     summary="Run Market Intelligence Pipeline (Async via Celery)",
 )
 async def run_agent(request: AgentRequest):
-    """Dispatch the intelligence pipeline as a Celery task. Returns task_id for polling."""
-    from cache.redis_client import check_rate_limit
-    if not check_rate_limit(
-        "pipeline_global",
-        limit=settings.LLM_GLOBAL_PIPELINE_LIMIT,
-        window_seconds=120,
-    ):
-        raise HTTPException(
-            status_code=429,
-            detail=f"Pipeline capacity reached (max {settings.LLM_GLOBAL_PIPELINE_LIMIT} concurrent). Retry in ~2 min.",
-        )
+    """Dispatch the intelligence pipeline as a Celery task. Returns task_id for polling.
 
+    Concurrency is bounded only by Celery worker pool capacity and broker queue
+    depth — no per-window dispatch cap.
+    """
     logger.info("API — Pipeline dispatched for: '%s'", request.company_name)
     task = run_market_pipeline.delay(request.company_name, request.date_window_days)
     return {"task_id": task.id, "status": "PENDING"}
@@ -310,135 +296,86 @@ def task_status(task_id: str):
 # ────────────────────────────────────────────────────────────────────
 
 from fastapi.responses import StreamingResponse
-from queue import Queue
 import json as json_lib
-import threading
+import uuid
+
+# SSE stream <-> Celery task bridge. Keep in sync with tasks.pipeline_tasks.
+_STREAM_KEY_FMT = "pipeline:events:{stream_id}"
+_STREAM_TERMINAL_EVENTS = {"complete", "error"}
+_STREAM_HEARTBEAT_SECONDS = 15
+_STREAM_MAX_SECONDS = 3600  # hard cap so a wedged task can't hold the connection forever
+
 
 @app.post(
     "/run-agent/stream",
     tags=["Intelligence"],
-    summary="Run Pipeline with Real-Time SSE Progress",
+    summary="Run Pipeline with Real-Time SSE Progress (via Celery)",
 )
 async def run_agent_stream(request: AgentRequest):
-    """Execute the intelligence pipeline and stream progress events via SSE."""
-    from cache.redis_client import check_rate_limit
+    """Dispatch the pipeline as a Celery task and stream progress + final result
+    over SSE. Heavy work runs on the Celery worker pool, not the API process,
+    so concurrency scales with worker capacity instead of API event-loop slots.
+    """
+    from cache.redis_client import get_redis
+    from app.celery_app import celery as _celery
 
-    if not check_rate_limit(
-        "pipeline_global",
-        limit=settings.LLM_GLOBAL_PIPELINE_LIMIT,
-        window_seconds=120,
-    ):
-        raise HTTPException(
-            status_code=429,
-            detail=f"Pipeline capacity reached (max {settings.LLM_GLOBAL_PIPELINE_LIMIT} concurrent). Retry in ~2 min.",
-        )
+    stream_id = uuid.uuid4().hex
+    stream_key = _STREAM_KEY_FMT.format(stream_id=stream_id)
 
-    progress_queue: Queue = Queue()
+    task = run_market_pipeline.apply_async(
+        args=[request.company_name, request.date_window_days],
+        kwargs={"stream_id": stream_id},
+        queue="pipeline",
+        routing_key="pipeline.run",
+    )
+    logger.info("SSE — dispatched task=%s stream=%s company='%s'",
+                task.id, stream_id, request.company_name)
 
-    def progress_callback(node_name: str, status: str, elapsed: float = 0):
-        """Called by each graph node via the _progress_callback state key."""
-        progress_queue.put({
-            "event": "node_progress",
-            "node": node_name,
-            "status": status,
-            "elapsed": round(elapsed, 2),
-        })
-
-    def run_pipeline_thread():
-        """Run the graph in a background thread, pushing events to the queue."""
-        ACTIVE_PIPELINES.inc()
-        try:
-            graph = app.state.graph
-            result = asyncio.run(graph.ainvoke({
-                "company_name": request.company_name,
-                "date_window_days": request.date_window_days,
-                "_progress_callback": progress_callback,
-            }))
-
-            report = result.get("synthesis_report", {})
-            if not report:
-                progress_queue.put({
-                    "event": "error",
-                    "detail": "Pipeline produced no report.",
-                })
-                return
-
-            # Record metrics
-            error_msg = result.get("error") or report.get("metadata", {}).get("error")
-            features = report.get("features", [])
-            if error_msg and not features:
-                PIPELINE_RUNS.labels(status="error").inc()
-            else:
-                PIPELINE_RUNS.labels(status="completed").inc()
-
-            for f in features:
-                cat = f.get("category", "unknown") if isinstance(f, dict) else "unknown"
-                FEATURES_EXTRACTED.labels(company=request.company_name, category=cat).inc()
-                score = f.get("confidence_score", 0) if isinstance(f, dict) else 0
-                CONFIDENCE_SCORE.observe(score)
-
-            FEATURES_VERIFIED.labels(company=request.company_name).inc(
-                report.get("total_features_verified", 0)
-            )
-            SOURCES_ANALYSED.observe(report.get("total_sources_analysed", 0))
-
-            # Build safe response
-            safe_features = []
-            for i, f in enumerate(features):
-                if isinstance(f, dict):
-                    try:
-                        safe_features.append(_safe_feature(f, i).model_dump())
-                    except Exception:
-                        pass
-
-            raw_sources = report.get("all_sources") or []
-            safe_sources = [str(s) for s in raw_sources] if isinstance(raw_sources, list) else []
-
-            # Persist to DB
-            try:
-                db = SessionLocal()
-                crud.save_report(db, request.company_name, report)
-                db.close()
-            except Exception as db_exc:
-                logger.warning("SSE — DB persistence failed (non-fatal): %s", db_exc)
-
-            # Push final result event
-            progress_queue.put({
-                "event": "complete",
-                "data": {
-                    "company_name": report.get("company_name", request.company_name),
-                    "generated_at": report.get("generated_at", datetime.now(timezone.utc).isoformat()),
-                    "executive_summary": report.get("executive_summary", "No summary available."),
-                    "features": safe_features,
-                    "total_sources_analysed": report.get("total_sources_analysed", 0),
-                    "total_features_verified": report.get("total_features_verified", 0),
-                    "all_sources": safe_sources,
-                    "metadata": report.get("metadata"),
-                },
-            })
-
-        except Exception as exc:
-            PIPELINE_RUNS.labels(status="error").inc()
-            logger.error("SSE — Pipeline error: %s", exc, exc_info=True)
-            progress_queue.put({
-                "event": "error",
-                "detail": str(exc)[:500],
-            })
-        finally:
-            ACTIVE_PIPELINES.dec()
-            progress_queue.put(None)  # Sentinel to close stream
-
-    # Start pipeline in a background thread
-    thread = threading.Thread(target=run_pipeline_thread, daemon=True)
-    thread.start()
+    redis_conn = get_redis()
 
     async def event_generator():
-        """Async generator that yields SSE events from the queue."""
-        while True:
-            msg = await asyncio.to_thread(progress_queue.get, timeout=300)
-            if msg is None:
-                break
-            yield f"data: {json_lib.dumps(msg)}\n\n"
+        start = time.time()
+        try:
+            yield (
+                f"data: {json_lib.dumps({'event': 'dispatched', 'task_id': task.id, 'stream_id': stream_id})}\n\n"
+            )
+            while True:
+                if time.time() - start > _STREAM_MAX_SECONDS:
+                    yield f"data: {json_lib.dumps({'event': 'error', 'detail': 'stream timeout'})}\n\n"
+                    break
+
+                popped = await asyncio.to_thread(
+                    redis_conn.brpop, stream_key, _STREAM_HEARTBEAT_SECONDS
+                )
+                if popped is None:
+                    # No event in this window — emit a heartbeat and check the
+                    # task hasn't died silently (worker crash, lost message).
+                    yield ": keepalive\n\n"
+                    try:
+                        result = AsyncResult(task.id, app=_celery)
+                        if result.failed():
+                            err = str(result.result)[:500] if result.result else "task failed"
+                            yield f"data: {json_lib.dumps({'event': 'error', 'detail': err})}\n\n"
+                            break
+                    except Exception:
+                        pass
+                    continue
+
+                _, raw = popped
+                try:
+                    msg = json_lib.loads(raw)
+                except Exception as exc:
+                    logger.debug("SSE — malformed stream event dropped: %s", exc)
+                    continue
+
+                yield f"data: {json_lib.dumps(msg)}\n\n"
+                if msg.get("event") in _STREAM_TERMINAL_EVENTS:
+                    break
+        finally:
+            try:
+                redis_conn.delete(stream_key)
+            except Exception:
+                pass
 
     return StreamingResponse(
         event_generator(),

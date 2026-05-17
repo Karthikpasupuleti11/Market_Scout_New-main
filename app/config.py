@@ -32,7 +32,6 @@ class Settings(BaseSettings):
     LLM_TOP_P: float = 0.7
     # Rate limits
     LLM_RPM_PER_KEY: int = int(os.getenv("LLM_RPM_PER_KEY", "40"))
-    LLM_GLOBAL_PIPELINE_LIMIT: int = int(os.getenv("LLM_GLOBAL_PIPELINE_LIMIT", "3"))
     LLM_PROMPT_CACHE_TTL: int = int(os.getenv("LLM_PROMPT_CACHE_TTL", "86400"))
 
     # ── Search ─────────────────────────────────────────────────────
