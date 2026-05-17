@@ -11,7 +11,7 @@ celery = Celery(
 
 @worker_process_init.connect
 def _start_metrics_server(**_):
-    start_http_server(8001)
+    start_http_server(9100)
 
 celery.conf.update(
     task_serializer="json",

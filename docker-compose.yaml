@@ -29,7 +29,7 @@ services:
     command: celery -A app.celery_app worker --loglevel=info --concurrency=1
 
     ports:
-      - "8001:8001"
+      - "9100:9100"
 
     env_file: .env
 
