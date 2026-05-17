@@ -282,11 +282,11 @@ def clear_storage(db: Session = Depends(get_db)):
         from database.models import Competitor, Report, Feature
         from database.scheduled_job_model import ScheduledJob
         
-        # Explicitly delete all to avoid FK issues
+        # Explicitly delete all to avoid FK issues (delete children first)
+        db.query(ScheduledJob).delete()
         db.query(Feature).delete()
         db.query(Report).delete()
         db.query(Competitor).delete()
-        db.query(ScheduledJob).delete()
         
         db.commit()
         return {"status": "success", "message": "Database storage cleared."}
