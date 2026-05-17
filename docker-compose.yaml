@@ -132,12 +132,14 @@ services:
       - scout_net
 
   # ── Flower — Celery monitoring UI ─────────────────────────────
+    # ── Flower — Celery monitoring UI ─────────────────────────────
   flower:
     build: .
     container_name: market_flower
     command: >
       celery -A app.celery_app --broker=redis://redis:6379/0 flower
       --port=5555
+      --url_prefix=flower
       --basic_auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-admin}
     ports:
       - "5555:5555"
