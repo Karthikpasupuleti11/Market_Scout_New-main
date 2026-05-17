@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
     HiOutlineGlobeAlt,
@@ -8,6 +8,8 @@ import {
     HiOutlineClock,
     HiOutlineChartBar,
     HiOutlineCog,
+    HiOutlineMenu,
+    HiOutlineX,
 } from 'react-icons/hi';
 import { SiPrometheus, SiGrafana } from 'react-icons/si';
 import { getHealth } from '../api';
@@ -36,8 +38,16 @@ const EXTERNAL_LINKS = [
 export default function Sidebar() {
     const location = useLocation();
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [backendUp, setBackendUp] = useState(null); // null = checking, true = up, false = down
     const intervalRef = useRef(null);
+
+    // Close sidebar on route change (mobile)
+    useEffect(() => {
+        setSidebarOpen(false);
+    }, [location.pathname]);
+
+    const toggleSidebar = useCallback(() => setSidebarOpen(prev => !prev), []);
 
     useEffect(() => {
         async function check() {
@@ -58,7 +68,24 @@ export default function Sidebar() {
 
     return (
         <>
-            <aside className="sidebar">
+            {/* Hamburger button — visible on mobile only */}
+            <button
+                className="sidebar-hamburger"
+                onClick={toggleSidebar}
+                aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
+            >
+                {sidebarOpen ? <HiOutlineX /> : <HiOutlineMenu />}
+            </button>
+
+            {/* Backdrop — visible on mobile when sidebar open */}
+            {sidebarOpen && (
+                <div
+                    className="sidebar-backdrop visible"
+                    onClick={() => setSidebarOpen(false)}
+                />
+            )}
+
+            <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
 
                 {/* ── Navigation ──────────────────────────────────── */}
                 <nav className="sidebar-nav">

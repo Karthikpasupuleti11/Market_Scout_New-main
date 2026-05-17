@@ -959,4 +959,96 @@
     .signal-expanded {
         padding-left: 20px;
     }
+
+    .result-header-row {
+        flex-direction: column;
+    }
+
+    .result-header-card {
+        padding: 20px;
+    }
+
+    .pipeline-anim-header {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .pipeline-anim-timer {
+        align-items: flex-start;
+    }
+
+    .executive-card,
+    .distribution-card {
+        padding: 20px;
+    }
+
+    .dist-cat {
+        min-width: 70px;
+        font-size: 0.6rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .intel-input-section {
+        padding: 18px;
+    }
+
+    .intel-input {
+        height: 48px;
+        font-size: 0.9rem;
+    }
+
+    .intel-run-btn,
+    .intel-stop-btn {
+        height: 48px;
+        padding: 0 20px;
+    }
+
+    .pipeline-anim-card {
+        padding: 18px;
+    }
+
+    .timer-value {
+        font-size: 1.2rem;
+    }
+
+    .flow-node {
+        width: 26px;
+        height: 26px;
+        font-size: 0.6rem;
+    }
+
+    .flow-connector {
+        width: 10px;
+    }
+
+    .flow-label {
+        font-size: 0.55rem;
+    }
+
+    .result-header-card h2 {
+        font-size: 1.3rem;
+    }
+
+    .signal-header {
+        padding: 12px 14px;
+        gap: 8px;
+    }
+
+    .signal-expanded {
+        padding: 0 14px 16px 14px;
+    }
+
+    .exec-stat-value {
+        font-size: 1.2rem;
+    }
+
+    .evidence-toggle {
+        padding: 14px 16px;
+        font-size: 0.875rem;
+    }
+
+    .evidence-list {
+        padding: 0 16px 16px;
+    }
 }

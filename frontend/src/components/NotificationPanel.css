@@ -214,3 +214,29 @@
     color: var(--error);
     background: var(--error-bg);
 }
+
+/* ── Responsive ────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .notif-panel {
+        position: fixed;
+        top: var(--header-height);
+        left: 8px;
+        right: 8px;
+        width: auto;
+        max-height: 70vh;
+        border-radius: var(--radius-lg);
+    }
+}
+
+@media (max-width: 480px) {
+    .notif-panel {
+        left: 4px;
+        right: 4px;
+    }
+
+    .notif-item {
+        padding: 10px 14px;
+        gap: 8px;
+    }
+}
+

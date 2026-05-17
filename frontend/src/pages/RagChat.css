@@ -464,4 +464,45 @@
     .rag-msg-user,
     .rag-msg-bot,
     .rag-sources { max-width: 92%; }
+
+    .rag-container {
+        height: calc(100vh - var(--header-height) - 48px);
+        max-height: calc(100vh - var(--header-height) - 48px);
+    }
+}
+
+@media (max-width: 480px) {
+    .rag-upload-card {
+        padding: 14px 16px;
+    }
+
+    .rag-chat-header {
+        padding: 10px 16px;
+    }
+
+    .rag-messages {
+        padding: 16px;
+        gap: 14px;
+    }
+
+    .rag-input-row {
+        padding: 10px 14px;
+        gap: 8px;
+    }
+
+    .rag-input {
+        padding: 8px 12px;
+        font-size: 0.82rem;
+    }
+
+    .rag-send-btn {
+        padding: 8px 14px;
+        font-size: 0.8rem;
+    }
+
+    .rag-msg-user,
+    .rag-msg-bot {
+        max-width: 95%;
+        font-size: 0.82rem;
+    }
 }

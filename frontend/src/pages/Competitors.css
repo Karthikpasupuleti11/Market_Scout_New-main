@@ -280,4 +280,43 @@
     .watchlist-grid {
         grid-template-columns: 1fr;
     }
+
+    .wl-card-top {
+        flex-wrap: wrap;
+    }
+
+    .wl-stats-row {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .wl-card-actions {
+        flex-wrap: wrap;
+    }
+}
+
+@media (max-width: 480px) {
+    .watchlist-card {
+        padding: 16px;
+        gap: 10px;
+    }
+
+    .comp-avatar {
+        width: 36px;
+        height: 36px;
+        font-size: 0.9rem;
+    }
+
+    .comp-name {
+        font-size: 0.95rem;
+    }
+
+    .wl-insight-preview {
+        font-size: 0.78rem;
+    }
+
+    .modal-box {
+        padding: 24px;
+        margin: 0 12px;
+    }
 }

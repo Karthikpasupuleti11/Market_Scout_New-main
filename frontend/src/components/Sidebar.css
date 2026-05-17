@@ -265,3 +265,100 @@
     font-weight: 700;
     letter-spacing: 0.5px;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   HAMBURGER MENU BUTTON (mobile only)
+   ═══════════════════════════════════════════════════════════════════ */
+
+.sidebar-hamburger {
+    display: none;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: var(--radius-sm);
+    transition: background 0.15s, color 0.15s;
+    align-items: center;
+    justify-content: center;
+}
+
+.sidebar-hamburger:hover {
+    background: var(--bg-input);
+}
+
+/* Backdrop overlay */
+.sidebar-backdrop {
+    display: none;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Tablet (≤ 1024px) ─────────────────────────────────────────── */
+@media (max-width: 1024px) {
+    .sidebar {
+        width: var(--sidebar-width);
+    }
+
+    .sidebar-nav {
+        padding: 14px 8px;
+        gap: 18px;
+    }
+
+    .nav-item {
+        padding: 9px 10px;
+        font-size: 0.82rem;
+    }
+
+    .nav-section-label {
+        font-size: 0.55rem;
+        padding: 0 10px;
+    }
+}
+
+/* ── Mobile (≤ 768px) — Slide-in drawer ────────────────────────── */
+@media (max-width: 768px) {
+    .sidebar-hamburger {
+        display: flex;
+    }
+
+    .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 260px;
+        z-index: 300;
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        padding-top: 16px;
+        box-shadow: none;
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+        box-shadow: 8px 0 30px rgba(0, 0, 0, 0.15);
+    }
+
+    .sidebar-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 250;
+        background: rgba(0, 0, 0, 0.3);
+        backdrop-filter: blur(2px);
+        animation: fadeIn 0.2s ease;
+    }
+
+    .sidebar-backdrop.visible {
+        display: block;
+    }
+
+    .sidebar-footer {
+        padding: 12px 16px;
+    }
+}

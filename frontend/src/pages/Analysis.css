@@ -830,6 +830,16 @@
 
 /* ── Responsive ────────────────────────────────────────────────── */
 
+@media (max-width: 1024px) {
+    .signals-comparison {
+        grid-template-columns: 1fr;
+    }
+
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 @media (max-width: 768px) {
     .analysis-hero-strip {
         grid-template-columns: 1fr;
@@ -842,5 +852,64 @@
     .charts-grid {
         grid-template-columns: 1fr;
     }
+
+    .analysis-selector {
+        padding: 20px;
+    }
+
+    .comp-summary-card,
+    .comp-direction-card,
+    .comp-overlap-card,
+    .comp-signals-card,
+    .comp-strength-card,
+    .comp-diff-card,
+    .comp-charts-card {
+        padding: 20px;
+    }
+
+    .mode-toggle {
+        width: 100%;
+    }
+
+    .mode-btn {
+        flex: 1;
+        justify-content: center;
+    }
+
+    .selector-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
 }
 
+@media (max-width: 480px) {
+    .analysis-hero-item {
+        padding: 10px 12px;
+    }
+
+    .analysis-hero-item span {
+        font-size: 0.65rem;
+    }
+
+    .comp-summary-headline {
+        font-size: 0.94rem;
+    }
+
+    .signal-compare-item {
+        padding: 10px 12px;
+    }
+
+    .sci-title {
+        font-size: 0.82rem;
+    }
+
+    .strength-item {
+        padding: 14px;
+        gap: 10px;
+    }
+
+    .strength-big {
+        font-size: 1.5rem;
+    }
+}
