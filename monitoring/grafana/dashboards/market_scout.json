@@ -76,7 +76,7 @@
                 "orientation": "auto",
                 "textMode": "auto",
                 "colorMode": "background",
-                "graphMode": "area",
+                "graphMode": "none",
                 "justifyMode": "auto"
             }
         },
@@ -162,7 +162,7 @@
             },
             "targets": [
                 {
-                    "expr": "active_pipelines",
+                    "expr": "sum(active_pipelines)",
                     "legendFormat": "Active",
                     "refId": "A"
                 }
@@ -205,9 +205,9 @@
                     "values": false
                 },
                 "colorMode": "background",
-                "graphMode": "area",
+                "graphMode": "none",
                 "justifyMode": "auto",
-                "textMode": "value_and_name"
+                "textMode": "auto"
             }
         },
         {
@@ -329,7 +329,7 @@
                     "values": false
                 },
                 "colorMode": "background",
-                "graphMode": "area",
+                "graphMode": "none",
                 "justifyMode": "auto",
                 "textMode": "auto"
             }
@@ -390,7 +390,7 @@
                     "values": false
                 },
                 "colorMode": "background",
-                "graphMode": "area",
+                "graphMode": "none",
                 "justifyMode": "auto",
                 "textMode": "auto"
             }
