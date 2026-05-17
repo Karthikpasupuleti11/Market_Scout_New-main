@@ -27,7 +27,8 @@ const SECONDARY_NAV = [
 ];
 
 const EXTERNAL_LINKS = [
-{ href: 'https://api.market-scout.me/docs', label: 'API Docs',   icon: <HiOutlineChartBar /> },
+    { href: 'http://localhost:5555', label: 'Flower Tasks', icon: <HiOutlineLightningBolt /> },
+    { href: 'https://api.market-scout.me/docs', label: 'API Docs',   icon: <HiOutlineChartBar /> },
     { href: 'https://metrics.market-scout.me',      label: 'Prometheus', icon: <SiPrometheus /> },
     { href: 'https://grafana.market-scout.me',      label: 'Grafana',    icon: <SiGrafana /> },
 ];

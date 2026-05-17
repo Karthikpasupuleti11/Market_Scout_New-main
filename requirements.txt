@@ -1,4 +1,4 @@
-﻿aiofile==3.9.0
+aiofile==3.9.0
 annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.12.1
@@ -176,3 +176,5 @@ wrapt==1.17.3
 xxhash==3.6.0
 zipp==3.23.0
 zstandard==0.25.0
+celery==5.4.0
+flower==2.0.1

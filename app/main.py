@@ -320,12 +320,14 @@ def dashboard_stats(db: Session = Depends(get_db)):
 
 @app.post(
     "/run-agent",
-    response_model=AgentResponse,
     tags=["Intelligence"],
-    summary="Run Market Intelligence Pipeline",
+    summary="Submit Market Intelligence Pipeline (Async via Celery)",
 )
 async def run_agent(request: AgentRequest):
-    """Execute the full intelligence pipeline for a given company."""
+    """Enqueue the intelligence pipeline as a Celery task.
+
+    Returns a task_id immediately. Poll /task/{task_id} for progress and results.
+    """
     # Global concurrency cap — prevents thundering herd against LLM rate limit.
     from cache.redis_client import check_rate_limit
     if not check_rate_limit(
@@ -338,98 +340,57 @@ async def run_agent(request: AgentRequest):
             detail=f"Pipeline capacity reached (max {settings.LLM_GLOBAL_PIPELINE_LIMIT} concurrent). Retry in ~2 min.",
         )
 
-    logger.info("API — Pipeline invoked for: '%s'", request.company_name)
-    ACTIVE_PIPELINES.inc()
+    logger.info("API — Pipeline enqueued for: '%s'", request.company_name)
 
-    try:
-        graph = app.state.graph
-        # Run the pipeline in a thread pool to avoid blocking the event loop
-        result = await asyncio.to_thread(
-            graph.invoke,
-            {
-                "company_name": request.company_name,
-                "date_window_days": request.date_window_days,
-            },
-        )
+    from celery_app.tasks import run_pipeline_task
+    task = run_pipeline_task.delay(
+        company_name=request.company_name,
+        date_window_days=request.date_window_days,
+    )
 
-        report = result.get("synthesis_report", {})
-        if not report:
-            PIPELINE_RUNS.labels(status="error").inc()
-            raise HTTPException(status_code=500, detail="Pipeline produced no report.")
+    return {
+        "task_id": task.id,
+        "status": "PENDING",
+        "company_name": request.company_name,
+        "message": "Pipeline enqueued. Poll /task/{task_id} for progress.",
+    }
 
-        # ── Record metrics ─────────────────────────────────────────
-        error = result.get("error") or report.get("metadata", {}).get("error")
-        features = report.get("features", [])
 
-        if error and not features:
-            PIPELINE_RUNS.labels(status="error").inc()
-        else:
-            PIPELINE_RUNS.labels(status="completed").inc()
+class TaskStatusResponse(BaseModel):
+    task_id: str
+    status: str
+    progress: Optional[Dict[str, Any]] = None
+    result: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
 
-        # Feature-level metrics
-        for f in features:
-            cat = f.get("category", "unknown") if isinstance(f, dict) else "unknown"
-            FEATURES_EXTRACTED.labels(company=request.company_name, category=cat).inc()
-            score = f.get("confidence_score", 0) if isinstance(f, dict) else 0
-            CONFIDENCE_SCORE.observe(score)
 
-        FEATURES_VERIFIED.labels(company=request.company_name).inc(
-            report.get("total_features_verified", 0)
-        )
-        SOURCES_ANALYSED.observe(report.get("total_sources_analysed", 0))
+@app.get(
+    "/task/{task_id}",
+    response_model=TaskStatusResponse,
+    tags=["Intelligence"],
+    summary="Poll pipeline task status",
+)
+async def get_task_status(task_id: str):
+    """Check the status/progress/result of a pipeline task.
 
-        # ── Build response ─────────────────────────────────────────
-        safe_features = []
-        for i, f in enumerate(features):
-            if isinstance(f, dict):
-                try:
-                    safe_features.append(_safe_feature(f, i))
-                except Exception as feat_exc:
-                    logger.warning("API — Skipping invalid feature #%d: %s — data: %s", i, feat_exc, f)
-            else:
-                logger.warning("API — Skipping non-dict feature #%d: %s", i, type(f))
+    Status values: PENDING, STARTED, PROGRESS, SUCCESS, FAILURE, RETRY, REVOKED
+    """
+    from celery_app.tasks import run_pipeline_task
+    result = run_pipeline_task.AsyncResult(task_id)
 
-        # Ensure all_sources is a list of strings
-        raw_sources = report.get("all_sources") or []
-        safe_sources = [str(s) for s in raw_sources] if isinstance(raw_sources, list) else None
+    response = {"task_id": task_id, "status": result.status}
 
-        response = AgentResponse(
-            company_name=report.get("company_name", request.company_name),
-            generated_at=report.get("generated_at", datetime.now(timezone.utc).isoformat()),
-            executive_summary=report.get("executive_summary", "No summary available."),
-            features=safe_features,
-            total_sources_analysed=report.get("total_sources_analysed", 0),
-            total_features_verified=report.get("total_features_verified", 0),
-            all_sources=safe_sources,
-            metadata=report.get("metadata"),
-        )
+    if result.status == "PROGRESS":
+        response["progress"] = result.info or {}
+    elif result.status == "SUCCESS":
+        response["result"] = result.result
+    elif result.status == "FAILURE":
+        response["error"] = str(result.result) if result.result else "Task failed"
+    elif result.status == "RETRY":
+        response["progress"] = {"message": "Task is being retried"}
 
-        # ── Persist to PostgreSQL ──────────────────────────────────
-        try:
-            db = next(get_db())
-            crud.save_report(db, request.company_name, report)
-            logger.info("API — Report saved to PostgreSQL for '%s'", request.company_name)
-        except Exception as db_exc:
-            logger.warning("API — DB persistence failed (non-fatal): %s", db_exc)
+    return response
 
-        logger.info(
-            "API — Report: %d features, %d sources",
-            len(response.features), response.total_sources_analysed,
-        )
-        return response
-
-    except HTTPException:
-        raise
-    except ValueError as exc:
-        PIPELINE_RUNS.labels(status="guardrail_blocked").inc()
-        logger.error("API — ValueError during response build: %s", exc, exc_info=True)
-        raise HTTPException(status_code=422, detail=str(exc))
-    except Exception as exc:
-        PIPELINE_RUNS.labels(status="error").inc()
-        logger.error("API — Unexpected error: %s", exc, exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Internal error: {str(exc)}")
-    finally:
-        ACTIVE_PIPELINES.dec()
 
 
 # ────────────────────────────────────────────────────────────────────

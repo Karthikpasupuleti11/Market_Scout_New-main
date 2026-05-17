@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useRef, useCallback } from 'react';
-import { runPipelineSSE } from '../api';
+import { submitPipeline, getTaskStatus } from '../api';
 import { useSettings } from './SettingsContext';
 import { useNotifications } from './NotificationContext';
 
@@ -76,55 +76,66 @@ export function PipelineProvider({ children }) {
         startClock();
 
         try {
-            await runPipelineSSE(companyName.trim(), {
+            const data = await submitPipeline(companyName.trim(), {
                 signal: abortControllerRef.current.signal,
                 dateWindowDays: settings.analysis.timeWindow,
+            });
 
-                onProgress: (node, status, nodeElapsed) => {
-                    const stageIdx = NODE_TO_STAGE[node];
-                    if (stageIdx === undefined) return; // skip error/exit nodes
-
-                    if (status === 'start') {
-                        setActiveStage(stageIdx);
-                    } else if (status === 'done') {
-                        setCompletedStages(prev => {
-                            const next = new Set(prev);
-                            next.add(stageIdx);
-                            return next;
-                        });
-                        setStageLatencies(prev => ({
-                            ...prev,
-                            [stageIdx]: nodeElapsed,
-                        }));
+            const taskId = data.task_id;
+            
+            // Polling loop
+            let isDone = false;
+            while (!isDone && !abortControllerRef.current.signal.aborted) {
+                const statusRes = await getTaskStatus(taskId);
+                
+                if (statusRes.status === 'PROGRESS' && statusRes.progress) {
+                    const prog = statusRes.progress;
+                    if (prog.current_node) {
+                        const stageIdx = NODE_TO_STAGE[prog.current_node];
+                        if (stageIdx !== undefined) setActiveStage(stageIdx);
                     }
-                },
-
-                onComplete: (data) => {
-                    // Mark all stages as done
+                    if (prog.stages) {
+                        const newCompleted = new Set();
+                        const newLatencies = {};
+                        for (const [node, info] of Object.entries(prog.stages)) {
+                            const sIdx = NODE_TO_STAGE[node];
+                            if (sIdx !== undefined && info.status === 'done') {
+                                newCompleted.add(sIdx);
+                                newLatencies[sIdx] = info.elapsed || 0;
+                            }
+                        }
+                        setCompletedStages(newCompleted);
+                        setStageLatencies(newLatencies);
+                    }
+                } else if (statusRes.status === 'SUCCESS') {
+                    isDone = true;
                     setActiveStage(Object.keys(NODE_TO_STAGE).length);
-                    setResult(data);
-                    const featureCount = data?.features?.length || 0;
+                    setResult(statusRes.result);
+                    const featureCount = statusRes.result?.features?.length || 0;
                     addNotification(
                         'success',
                         `Analysis Complete: ${companyName.trim()}`,
                         `Report generated with ${featureCount} signal${featureCount !== 1 ? 's' : ''} detected.`
                     );
-                },
+                } else if (statusRes.status === 'FAILURE') {
+                    isDone = true;
+                    throw new Error(statusRes.error || 'Pipeline execution failed');
+                }
 
-                onError: (detail) => {
-                    setError(detail || 'Pipeline execution failed');
-                    addNotification(
-                        'error',
-                        `Analysis Failed: ${companyName.trim()}`,
-                        detail || 'Pipeline execution failed'
-                    );
-                },
-            });
+                if (!isDone) {
+                    await new Promise(r => setTimeout(r, 2000));
+                }
+            }
         } catch (err) {
-            if (err.name === 'AbortError') {
+            if (err.name === 'AbortError' || abortControllerRef.current?.signal.aborted) {
                 setError('Pipeline stopped by user.');
             } else {
                 setError(err.message || 'Pipeline execution failed');
+                addNotification(
+                    'error',
+                    `Analysis Failed: ${companyName.trim()}`,
+                    err.message || 'Pipeline execution failed'
+                );
             }
         } finally {
             abortControllerRef.current = null;

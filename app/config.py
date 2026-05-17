@@ -98,6 +98,19 @@ class Settings(BaseSettings):
     # Set false on multi-worker API replicas; only one process should run scheduler.
     ENABLE_SCHEDULER: bool = os.getenv("ENABLE_SCHEDULER", "True") == "True"
 
+    # ── Celery ─────────────────────────────────────────────────────
+    CELERY_BROKER_URL: str = os.getenv(
+        "CELERY_BROKER_URL",
+        f"redis://{os.getenv('REDIS_HOST', 'localhost')}:{os.getenv('REDIS_PORT', '6379')}/1",
+    )
+    CELERY_RESULT_BACKEND: str = os.getenv(
+        "CELERY_RESULT_BACKEND",
+        f"redis://{os.getenv('REDIS_HOST', 'localhost')}:{os.getenv('REDIS_PORT', '6379')}/2",
+    )
+
+    # ── Concurrency Controls ───────────────────────────────────────
+    PLAYWRIGHT_MAX_CONCURRENT: int = int(os.getenv("PLAYWRIGHT_MAX_CONCURRENT", "3"))
+
    # ── Gmail API Configuration ────────────────────────────────────
 
     EMAIL_SENDER: str = os.getenv(
