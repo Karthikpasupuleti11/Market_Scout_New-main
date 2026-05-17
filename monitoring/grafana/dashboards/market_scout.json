@@ -238,6 +238,7 @@
                     "decimals": 1,
                     "min": 0,
                     "max": 300,
+                    "noValue": "0",
                     "color": {
                         "mode": "thresholds"
                     },
@@ -1059,6 +1060,8 @@
             ],
             "fieldConfig": {
                 "defaults": {
+                    "noValue": "0",
+                    "min": 0,
                     "color": {
                         "mode": "palette-classic"
                     }
@@ -1171,6 +1174,8 @@
             ],
             "fieldConfig": {
                 "defaults": {
+                    "noValue": "0",
+                    "min": 0,
                     "color": {
                         "mode": "palette-classic"
                     }
@@ -1349,5 +1354,5 @@
     "timezone": "browser",
     "title": "Market Intelligence Scout",
     "uid": "market-scout-main",
-    "version": 2
+    "version": 3
 }
