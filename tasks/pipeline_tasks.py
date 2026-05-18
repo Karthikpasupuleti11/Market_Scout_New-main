@@ -10,6 +10,9 @@ from observability.metrics import (
 )
 
 from utils.feature_utils import _safe_feature
+from app.rag.service import process_report
+
+import asyncio
 
 graph = build_graph()
 
@@ -68,6 +71,13 @@ def run_market_pipeline(self, company_name, date_window_days):
         "all_sources": report.get("all_sources", []),
         "metadata": report.get("metadata"),
     }
+
+    # ── Build conversational RAG index ─────────────────
+
+    try:
+        asyncio.run(process_report(response))
+    except Exception as e:
+        print("RAG processing failed:", e)
 
     # ── Save DB ─────────────────────────────
     try:

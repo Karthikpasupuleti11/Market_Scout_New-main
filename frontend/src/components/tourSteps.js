@@ -49,22 +49,6 @@ export const TOUR_STEPS = [
     position: 'bottom',
   },
 
-  // ── 5. RAG — Upload & Query ─────────────────────────────────────
-  {
-    page: '/rag',
-    target: '.rag-upload-card',
-    title: 'Ask Your Report (AI Q&A)',
-    description: 'Upload a generated report and interact with it using AI. Instead of reading long PDFs, ask direct questions and get instant answers.',
-    position: 'bottom',
-  },
-  {
-    page: '/rag',
-    target: '.rag-input-row',
-    title: 'Ask Questions Instantly',
-    description: 'Type any question about the report. The system retrieves relevant sections and answers with source references.',
-    position: 'top',
-  },
-
   // ── 6. AUTOMATION ───────────────────────────────────────────────
   {
     page: '/schedule',
