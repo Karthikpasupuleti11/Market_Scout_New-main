@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
 import {
@@ -11,6 +11,7 @@ import {
   HiOutlineTrash,
   HiOutlineExclamationCircle,
   HiOutlineX,
+  HiOutlineChatAlt2,
 } from "react-icons/hi";
 import { getReports, deleteReport } from "../api";
 import { generateReportPDF } from "../utils/pdfExport";
@@ -27,6 +28,7 @@ export default function Reports() {
   const [searched, setSearched] = useState(false);
   const [expanded, setExpanded] = useState(null);
   const [pdfLoadingIdx, setPdfLoadingIdx] = useState(null);
+  const [assistantOpenIdx, setAssistantOpenIdx] = useState(null);
 
   const location = useLocation();
 
@@ -75,6 +77,18 @@ export default function Reports() {
       setPdfLoadingIdx(null);
     }
   };
+
+  const scrollToReportAssistant = useCallback((idx, e) => {
+    e?.stopPropagation?.();
+    setExpanded(idx);
+    setAssistantOpenIdx(idx);
+    window.setTimeout(() => {
+      document.getElementById(`report-assistant-section-${idx}`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }, 220);
+  }, []);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -219,25 +233,38 @@ export default function Reports() {
                     </div>
                   </div>
                   <div className="report-actions">
-                    <button
-                      className="btn btn-pdf btn-pdf-sm"
-                      onClick={e => { e.stopPropagation(); handleDownloadPDF(report, i); }}
-                      disabled={pdfLoadingIdx === i}
-                      title="Download as PDF"
-                    >
-                      {pdfLoadingIdx === i ? (
-                        <><span className="spinner spinner-sm" /> PDF</>
-                      ) : (
-                        <><HiOutlineDownload /> PDF</>
-                      )}
-                    </button>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={e => { e.stopPropagation(); askDelete(report, i); }}
-                      title="Delete report"
-                    >
-                      <HiOutlineTrash />
-                    </button>
+                    <div className="report-actions-stack">
+                      <button
+                        className="btn btn-pdf btn-pdf-sm"
+                        onClick={e => { e.stopPropagation(); handleDownloadPDF(report, i); }}
+                        disabled={pdfLoadingIdx === i}
+                        title="Download as PDF"
+                        type="button"
+                      >
+                        {pdfLoadingIdx === i ? (
+                          <><span className="spinner spinner-sm" /> PDF</>
+                        ) : (
+                          <><HiOutlineDownload /> PDF</>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-report-assistant-jump btn-pdf-sm"
+                        onClick={e => scrollToReportAssistant(i, e)}
+                        title="Jump to Report Assistant below"
+                      >
+                        <HiOutlineChatAlt2 />
+                        Assistant
+                      </button>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={e => { e.stopPropagation(); askDelete(report, i); }}
+                        title="Delete report"
+                        type="button"
+                      >
+                        <HiOutlineTrash /> Delete
+                      </button>
+                    </div>
                     <span className="report-expand-icon">
                       {isOpen ? <HiChevronUp /> : <HiChevronDown />}
                     </span>
@@ -270,8 +297,12 @@ export default function Reports() {
                       </div>
                     )}
 
-                      {/* Report Assistant */}
-                      <ReportAssistant report={report} companyName={company} />
+                    <div
+                      id={`report-assistant-section-${i}`}
+                      className="report-assistant-anchor"
+                    >
+                      <ReportAssistant report={report} companyName={company} autoOpen={assistantOpenIdx === i} />
+                    </div>
                     </div>
                   )}
               </div>

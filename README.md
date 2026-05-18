@@ -2,7 +2,7 @@
 
 > AI-powered competitive intelligence platform that discovers, verifies, and scores technical signals from public sources in real time.
 
-Enter a company name → the system runs an 11-stage agentic pipeline → delivers a structured intelligence report with verified features, confidence scores, source citations, and an executive summary.
+Enter a company name → the system runs an agentic LangGraph pipeline (async via Celery) → delivers a structured intelligence report with verified features, confidence scores, source citations, and an executive summary.
 
 ---
 
@@ -40,7 +40,13 @@ cd Market_Scout
 
 ### 2. Create the `.env` File
 
-Create a `.env` file in the project root:
+Copy the template and add your API keys:
+
+```bash
+cp .env.example .env
+```
+
+Minimum required in `.env`:
 
 ```env
 NVIDIA_API_KEY=your_nvidia_api_key_here
@@ -149,7 +155,7 @@ Market_Scout/
 │   └── synthesis.py        #   Executive report generation
 │
 ├── graph/                  # LangGraph pipeline (builder.py, state.py)
-├── llm/                    # NVIDIA NIM client (LLaMA 3.3 70B)
+├── llm/                    # NVIDIA NIM client (Llama 3.1 8B Instruct)
 ├── celery_app/             # Celery async task worker configuration
 ├── scheduler/              # Automated scheduled analysis jobs
 ├── services/               # Business logic services
@@ -162,7 +168,7 @@ Market_Scout/
 │   └── src/
 │       ├── components/     #   Sidebar, TopBar, Settings, Notifications, GuidedTour
 │       └── pages/          #   Dashboard, RunPipeline, Reports, Analysis,
-│                           #   Competitors, Schedule, RagChat, About
+│                           #   Competitors, Schedule, About (+ Report Assistant on Intelligence)
 │
 ├── docker-compose.yaml     # 7-service container orchestration
 ├── Dockerfile              # Multi-stage Python container
@@ -196,7 +202,7 @@ Market_Scout/
                     ┌──────┘     ┌─────┘      ┌─────┘
                     ▼            ▼             ▼
                PostgreSQL     Redis       NVIDIA NIM
-               (Storage)     (Cache)    (LLaMA 3.3 70B)
+               (Storage)     (Cache)    (NVIDIA NIM LLM)
 ```
 
 ---
@@ -205,8 +211,8 @@ Market_Scout/
 
 | Layer             | Technologies                                                              |
 |-------------------|---------------------------------------------------------------------------|
-| **Backend**       | Python, FastAPI, LangGraph, Celery, NVIDIA NIM (LLaMA 3.3 70B), Tavily   |
-| **AI / ML**       | Sentence-BERT (all-MiniLM-L6-v2), LLM-based extraction & synthesis       |
+| **Backend**       | Python, FastAPI, LangGraph, Celery, NVIDIA NIM (Llama 3.1 8B), Tavily |
+| **AI / ML**       | NVIDIA NIM (Llama 3.1 8B Instruct), Sentence-BERT, LLM extraction & synthesis |
 | **Frontend**      | React 19, Vite, React Router, React Icons                                |
 | **Database**      | PostgreSQL 15, SQLAlchemy ORM, Redis 7                                   |
 | **Monitoring**    | Prometheus (14 custom metrics), Grafana (16-panel dashboard), Flower      |
@@ -215,9 +221,25 @@ Market_Scout/
 
 ---
 
+## 3-minute demo script (presentations)
+
+1. `docker compose up -d` — show `docker compose ps` (all services healthy).
+2. Open **http://localhost:5173** → **Intelligence** → run **OpenAI** (first run ~1–3 min; watch pipeline stages).
+3. Run **OpenAI** again — cached result returns in seconds (mention Redis + PostgreSQL cache).
+4. **Settings** → enable **Force fresh analysis** → re-run to show full pipeline reset.
+5. **Reports** / **Watchlist** — historical data and competitors.
+6. **http://localhost:3000** (Grafana) + **http://localhost:9090** (Prometheus) — observability story.
+7. Optional: **Report Assistant** on the intelligence results page (index report → ask a question).
+
+Backend pipeline path: `POST /run-agent` → Celery worker → poll `GET /task/{id}`.
+
 ## Useful Commands
 
 ```bash
+# Run API smoke tests (from repo root, venv active)
+pip install -r requirements-dev.txt
+pytest tests/ -q
+
 # ── Docker ─────────────────────────────────────────
 docker compose up -d              # Start all services
 docker compose down               # Stop all services

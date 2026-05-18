@@ -10,7 +10,7 @@ import './ReportAssistant.css';
  *   report      — the report object (must have company_name, executive_summary, features, all_sources)
  *   companyName — fallback company name if report.company_name is missing
  */
-export default function ReportAssistant({ report, companyName }) {
+export default function ReportAssistant({ report, companyName, autoOpen }) {
     const [open, setOpen] = useState(false);
     const [indexing, setIndexing] = useState(false);
     const [indexed, setIndexed] = useState(false);
@@ -23,6 +23,24 @@ export default function ReportAssistant({ report, companyName }) {
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
     const panelRef = useRef(null);
+
+    const handleIndex = async () => {
+        setIndexing(true);
+        setIndexError('');
+        try {
+            await indexReportForRag({
+                company_name: report.company_name || companyName,
+                executive_summary: report.executive_summary || '',
+                features: report.features || [],
+                all_sources: report.all_sources || [],
+            });
+            setIndexed(true);
+        } catch (err) {
+            setIndexError(err.message || 'Failed to index report. Please try again.');
+        } finally {
+            setIndexing(false);
+        }
+    };
 
     // Auto-scroll to bottom on new messages
     useEffect(() => {
@@ -50,23 +68,17 @@ export default function ReportAssistant({ report, companyName }) {
         }
     }, [reportKey]);
 
-    const handleIndex = async () => {
-        setIndexing(true);
-        setIndexError('');
-        try {
-            await indexReportForRag({
-                company_name: report.company_name || companyName,
-                executive_summary: report.executive_summary || '',
-                features: report.features || [],
-                all_sources: report.all_sources || [],
-            });
-            setIndexed(true);
-        } catch (err) {
-            setIndexError(err.message || 'Failed to index report. Please try again.');
-        } finally {
-            setIndexing(false);
+    // Auto-open AND auto-index when triggered by parent (Assistant button)
+    const prevAutoOpen = useRef(false);
+    useEffect(() => {
+        if (autoOpen && !prevAutoOpen.current) {
+            setOpen(true);
+            if (!indexed && !indexing) {
+                handleIndex();
+            }
         }
-    };
+        prevAutoOpen.current = !!autoOpen;
+    }, [autoOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleToggle = () => {
         setOpen(prev => {

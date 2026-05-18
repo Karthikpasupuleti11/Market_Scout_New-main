@@ -1,10 +1,14 @@
-# app/rag/service.py
+"""RAG indexing and Q&A over the active report (demo: single shared index in Redis)."""
+
+import logging
 
 from app.rag.embedding import embed, chunk_text
 from app.rag.pdf_loader import load_pdf
 from app.rag.vector_store import VectorStore
 from llm.nvidia_client import invoke_llm
 from cache.redis_client import get_redis
+
+logger = logging.getLogger(__name__)
 
 REDIS_KEY = "rag_index"
 
@@ -141,12 +145,11 @@ User question: {query}"""
 
     try:
         response = invoke_llm(messages)
-    except Exception as e:
-        print("LLM ERROR:", e)
-
+    except Exception as exc:
+        logger.warning("RAG — LLM call failed: %s", exc)
         return {
             "answer": "Unable to generate answer right now. Please try again.",
-            "sources": chunks
+            "sources": chunks,
         }
 
     return {

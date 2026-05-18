@@ -12,6 +12,7 @@ import {
     HiOutlineFilter,
     HiOutlineSortDescending,
     HiOutlineXCircle,
+    HiOutlineChatAlt2,
 } from 'react-icons/hi';
 import { generateReportPDF } from '../utils/pdfExport';
 import ReportAssistant from '../components/ReportAssistant';
@@ -94,9 +95,11 @@ export default function RunPipeline() {
     const [filterConfidence, setFilterConfidence] = useState('all');
     const [sortBy, setSortBy] = useState('confidence');
     const [expandedSignals, setExpandedSignals] = useState(new Set());
+    const [assistantAutoOpen, setAssistantAutoOpen] = useState(false);
 
     // Prevent duplicate auto-runs when navigated here via location.state
     const lastAutoRunCompanyRef = useRef('');
+    const reportAssistantRef = useRef(null);
 
     const toggleSignal = useCallback((idx) => {
         setExpandedSignals(prev => {
@@ -108,6 +111,9 @@ export default function RunPipeline() {
     }, []);
 
     const report = result?.report || result;
+    const fromCache = result?.from_cache || report?.metadata?.from_cache;
+    const pipelineNotice = report?.metadata?.error;
+    const hasSignals = (report?.features?.length ?? 0) > 0;
 
     const handleDownloadPDF = async () => {
         if (!report) return;
@@ -119,6 +125,14 @@ export default function RunPipeline() {
             setPdfLoading(false);
         }
     };
+
+    const scrollToReportAssistant = useCallback(() => {
+        setAssistantAutoOpen(true);
+        reportAssistantRef.current?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+        });
+    }, []);
 
     const handleRun = async (e) => {
         e.preventDefault();
@@ -292,11 +306,24 @@ export default function RunPipeline() {
             {result && report && (
                 <div className="results-section fade-in-up">
 
+                    {!hasSignals && (pipelineNotice || report.executive_summary) && (
+                        <div className="card pipeline-notice-card fade-in">
+                            <HiOutlineExclamationCircle className="notice-icon" />
+                            <div>
+                                <h3>No verified signals in this window</h3>
+                                <p>{report.executive_summary}</p>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="card result-header-card">
                         <div className="result-header-row">
                             <div className="result-meta">
                                 <h2>{report.company_name || company}</h2>
                                 <div className="result-badges">
+                                    {fromCache && (
+                                        <span className="badge badge-success">Cached</span>
+                                    )}
                                     <span className="badge badge-accent">{report.total_features_verified || report.features?.length || 0} Signals</span>
                                     <span className="badge badge-info">{report.total_sources_analysed || 0} Sources</span>
                                     {distribution.length > 0 && <span className="badge badge-purple">{distribution.length} Themes</span>}
@@ -305,19 +332,31 @@ export default function RunPipeline() {
                                     )}
                                 </div>
                             </div>
-                            <button
-                                className="btn btn-pdf"
-                                onClick={handleDownloadPDF}
-                                disabled={pdfLoading || loading}
-                                title="Download report as PDF"
-                                id="download-pdf-btn"
-                            >
-                                {pdfLoading ? (
-                                    <><span className="spinner spinner-sm" /> Generating…</>
-                                ) : (
-                                    <><HiOutlineDownload /> Download PDF</>
-                                )}
-                            </button>
+                            <div className="result-header-actions">
+                                <button
+                                    className="btn btn-pdf"
+                                    onClick={handleDownloadPDF}
+                                    disabled={pdfLoading || loading}
+                                    title="Download report as PDF"
+                                    id="download-pdf-btn"
+                                    type="button"
+                                >
+                                    {pdfLoading ? (
+                                        <><span className="spinner spinner-sm" /> Generating…</>
+                                    ) : (
+                                        <><HiOutlineDownload /> Download PDF</>
+                                    )}
+                                </button>
+                                <button
+                                    className="btn btn-report-assistant-jump"
+                                    type="button"
+                                    onClick={scrollToReportAssistant}
+                                    title="Jump to Report Assistant chat below"
+                                >
+                                    <HiOutlineChatAlt2 />
+                                    Report Assistant
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -494,7 +533,13 @@ export default function RunPipeline() {
                     )}
 
                     {/* ── Report Assistant (inline RAG chat) ─────── */}
-                    <ReportAssistant report={report} companyName={company} />
+                    <div
+                        id="report-assistant-section"
+                        ref={reportAssistantRef}
+                        className="report-assistant-anchor"
+                    >
+                        <ReportAssistant report={report} companyName={company} autoOpen={assistantAutoOpen} />
+                    </div>
                 </div>
             )}
         </div>
@@ -573,7 +618,7 @@ function SignalCard({ signal: f, index, isExpanded, onToggle }) {
     );
 }
 
-/* ── Pipeline Animation — now driven by real SSE progress events ── */
+/* ── Pipeline Animation — driven by Celery task progress polling ── */
 function PipelineAnimation({ company, activeStage, completedStages, stageLatencies, elapsed }) {
     const formatTime = (s) => {
         const m = Math.floor(s / 60);

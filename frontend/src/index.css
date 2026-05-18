@@ -1076,6 +1076,41 @@ a:hover {
   gap: 5px;
 }
 
+/* Jump to Report Assistant (Intelligence + Reports) */
+.btn-report-assistant-jump {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  border: 1px solid var(--border-accent);
+  background: var(--accent-soft);
+  color: var(--accent-primary);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-report-assistant-jump:hover {
+  background: rgba(46, 125, 50, 0.12);
+  border-color: var(--accent-primary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-report-assistant-jump:active {
+  transform: translateY(0);
+}
+
+.report-assistant-anchor {
+  scroll-margin-top: calc(var(--header-height) + 20px);
+}
+
 /* Result header row */
 .result-header {
   display: flex;

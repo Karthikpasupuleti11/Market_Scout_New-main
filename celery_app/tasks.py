@@ -7,11 +7,9 @@ FastAPI enqueues this task and returns a task_id immediately.
 
 import logging
 import time
-import json
-from datetime import datetime, timezone
 
-from celery import states
 from celery_app import celery_app
+from observability.metrics import ACTIVE_PIPELINES
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +55,18 @@ def run_pipeline_task(self, company_name: str, date_window_days: int = 7):
     task_id = self.request.id
     logger.info("CELERY TASK %s — Starting pipeline for '%s'", task_id, company_name)
 
+    ACTIVE_PIPELINES.inc()
+    try:
+        return _run_pipeline_body(self, company_name, date_window_days, task_id)
+    finally:
+        ACTIVE_PIPELINES.dec()
+
+
+def _run_pipeline_body(task_ref, company_name: str, date_window_days: int, task_id: str):
+    """Inner pipeline logic (ACTIVE_PIPELINES tracked by caller)."""
+    self = task_ref
+    start_time = time.time()
+
     # ── Update state to PROGRESS ──────────────────────────────────
     self.update_state(
         state="PROGRESS",
@@ -67,8 +77,6 @@ def run_pipeline_task(self, company_name: str, date_window_days: int = 7):
             "company_name": company_name,
         },
     )
-
-    start_time = time.time()
 
     try:
         # ── Lazy imports to avoid circular imports ────────────────
@@ -164,8 +172,12 @@ def serve_cached_report_task(
 ):
     """Return a pre-built report payload (instant SUCCESS for cache hits)."""
     logger.info("CELERY TASK — Serving cached report (source=%s)", cache_source)
-    out = dict(report_response)
-    out.setdefault("from_cache", True)
-    out.setdefault("cache_source", cache_source)
-    return out
+    ACTIVE_PIPELINES.inc()
+    try:
+        out = dict(report_response)
+        out.setdefault("from_cache", True)
+        out.setdefault("cache_source", cache_source)
+        return out
+    finally:
+        ACTIVE_PIPELINES.dec()
 

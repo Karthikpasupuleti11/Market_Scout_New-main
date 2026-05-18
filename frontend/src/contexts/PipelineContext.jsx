@@ -1,11 +1,12 @@
 import { createContext, useContext, useState, useRef, useCallback } from 'react';
 import { submitPipeline, getTaskStatus } from '../api';
+import { formatApiError } from '../utils/formatApiError';
 import { useSettings } from './SettingsContext';
 import { useNotifications } from './NotificationContext';
 
 /* ═══════════════════════════════════════════════════════════════════
-   PIPELINE CONTEXT — Real-time SSE-powered pipeline execution.
-   Node progress is streamed live from the backend (no fake timers).
+   PIPELINE CONTEXT — Celery async pipeline with task polling.
+   Progress stages come from GET /task/{id} (Celery PROGRESS meta).
    ═══════════════════════════════════════════════════════════════════ */
 
 // Map backend node names → frontend stage index
@@ -34,7 +35,7 @@ export function PipelineProvider({ children }) {
     const [result, setResult] = useState(null);
     const [error, setError] = useState('');
 
-    // ── Pipeline animation state (driven by SSE now) ─────────────
+    // ── Pipeline animation state (from Celery task progress) ───────
     const [activeStage, setActiveStage] = useState(-1);
     const [completedStages, setCompletedStages] = useState(new Set());
     const [stageLatencies, setStageLatencies] = useState({});
@@ -57,7 +58,7 @@ export function PipelineProvider({ children }) {
         clockTimerRef.current = null;
     }, []);
 
-    // ── Public: execute the pipeline with SSE streaming ──────────
+    // ── Public: enqueue pipeline and poll Celery task status ─────
     const executePipeline = useCallback(async (companyName) => {
         if (!companyName.trim()) return;
 
@@ -84,10 +85,17 @@ export function PipelineProvider({ children }) {
 
             const taskId = data.task_id;
             const pollIntervalMs = data.from_cache ? 250 : 2000;
-            
-            // Polling loop
+            const maxPollMs = data.from_cache ? 60_000 : 600_000;
+            const pollStarted = Date.now();
+
             let isDone = false;
             while (!isDone && !abortControllerRef.current.signal.aborted) {
+                if (Date.now() - pollStarted > maxPollMs) {
+                    throw new Error(
+                        'Analysis is taking longer than expected. Check Celery worker logs or try again.'
+                    );
+                }
+
                 const statusRes = await getTaskStatus(taskId);
                 
                 if (statusRes.status === 'PROGRESS' && statusRes.progress) {
@@ -140,14 +148,15 @@ export function PipelineProvider({ children }) {
                 }
             }
         } catch (err) {
+            const friendly = formatApiError(err);
             if (err.name === 'AbortError' || abortControllerRef.current?.signal.aborted) {
                 setError('Pipeline stopped by user.');
             } else {
-                setError(err.message || 'Pipeline execution failed');
+                setError(friendly);
                 addNotification(
                     'error',
                     `Analysis Failed: ${companyName.trim()}`,
-                    err.message || 'Pipeline execution failed'
+                    friendly
                 );
             }
         } finally {

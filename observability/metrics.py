@@ -22,8 +22,8 @@ APP_INFO = Info(
 )
 APP_INFO.info({
     "version": "2.0.0",
-    "llm_model": "meta/llama-3.3-70b-instruct",
-    "pipeline_nodes": "12",
+    "llm_model": "meta/llama-3.1-8b-instruct",
+    "pipeline_nodes": "11",
 })
 
 # ────────────────────────────────────────────────────────────────────

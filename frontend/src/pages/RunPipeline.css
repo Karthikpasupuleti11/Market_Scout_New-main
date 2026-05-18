@@ -2,6 +2,36 @@
    INTELLIGENCE PAGE — Phase 2: Interactive Intelligence System
    ═══════════════════════════════════════════════════════════════════ */
 
+/* ── Pipeline notice (early exit / no signals) ─────────────────── */
+
+.pipeline-notice-card {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    border-left: 4px solid var(--warning);
+    background: var(--warning-bg);
+}
+
+.pipeline-notice-card .notice-icon {
+    font-size: 1.5rem;
+    color: var(--warning);
+    flex-shrink: 0;
+}
+
+.pipeline-notice-card h3 {
+    font-size: 1rem;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.pipeline-notice-card p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
 /* ── Input Section ─────────────────────────────────────────────── */
 
 .intel-input-section {
@@ -317,6 +347,15 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 20px;
+}
+
+.result-header-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    flex-shrink: 0;
+    min-width: min(200px, 100%);
 }
 
 .result-header-card h2 {
@@ -962,6 +1001,17 @@
 
     .result-header-row {
         flex-direction: column;
+    }
+
+    .result-header-actions {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .result-header-actions .btn-pdf,
+    .result-header-actions .btn-report-assistant-jump {
+        width: 100%;
+        justify-content: center;
     }
 
     .result-header-card {
