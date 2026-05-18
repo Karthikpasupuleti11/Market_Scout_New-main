@@ -9,7 +9,6 @@ import logging
 import time
 
 from celery_app import celery_app
-from observability.metrics import ACTIVE_PIPELINES
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +54,7 @@ def run_pipeline_task(self, company_name: str, date_window_days: int = 7):
     task_id = self.request.id
     logger.info("CELERY TASK %s — Starting pipeline for '%s'", task_id, company_name)
 
+    from observability.metrics import ACTIVE_PIPELINES  # lazy: avoids Flower crash
     ACTIVE_PIPELINES.inc()
     try:
         return _run_pipeline_body(self, company_name, date_window_days, task_id)
@@ -172,6 +172,7 @@ def serve_cached_report_task(
 ):
     """Return a pre-built report payload (instant SUCCESS for cache hits)."""
     logger.info("CELERY TASK — Serving cached report (source=%s)", cache_source)
+    from observability.metrics import ACTIVE_PIPELINES  # lazy: avoids Flower crash
     ACTIVE_PIPELINES.inc()
     try:
         out = dict(report_response)

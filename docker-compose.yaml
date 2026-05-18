@@ -70,15 +70,17 @@ services:
     build: .
     container_name: market_flower
     command: >
+      sh -c "mkdir -p /tmp/prometheus_multiproc &&
       celery -A celery_app flower
       --port=5555
       --broker=redis://redis:6379/1
-      --broker_api=redis://redis:6379/1
+      --broker_api=redis://redis:6379/1"
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
     ports:
       - "5555:5555"
     depends_on:
