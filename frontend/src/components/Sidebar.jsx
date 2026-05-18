@@ -19,7 +19,6 @@ const PRIMARY_NAV = [
     { path: '/intelligence', label: 'Intelligence',  icon: <HiOutlineLightningBolt /> },
     { path: '/analysis',    label: 'Analysis',      icon: <HiOutlineChartBar /> },
     { path: '/reports',     label: 'Reports',       icon: <HiOutlineDocumentText /> },
-    { path: '/rag',         label: 'Report Assistant', icon: <HiOutlineChatAlt2 /> },
     { path: '/watchlist',   label: 'Watchlist',     icon: <HiOutlineEye /> },
 ];
 

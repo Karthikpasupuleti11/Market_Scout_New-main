@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useSettings } from '../contexts/SettingsContext';
-import { usePipeline } from '../contexts/PipelineContext';   // ← NEW
+import { usePipeline } from '../contexts/PipelineContext';
 import {
     HiOutlineLightningBolt,
     HiOutlineExternalLink,
@@ -12,9 +12,13 @@ import {
     HiOutlineFilter,
     HiOutlineSortDescending,
     HiOutlineXCircle,
+    HiOutlineChatAlt2,
+    HiOutlinePaperAirplane,
+    HiOutlineSparkles,
 } from 'react-icons/hi';
 import { generateReportPDF } from '../utils/pdfExport';
 import './RunPipeline.css';
+import { askRagQuestion } from '../api';
 
 const SUGGESTIONS = ['Google', 'OpenAI', 'Microsoft', 'Anthropic', 'Meta AI', 'Tesla'];
 
@@ -65,13 +69,12 @@ function deriveStrategicDirections(features) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   MAIN PAGE — state now lives in PipelineContext, not here
+   MAIN PAGE
    ═══════════════════════════════════════════════════════════════════ */
 export default function RunPipeline() {
     const location = useLocation();
     const { settings } = useSettings();
 
-    // ── Pull everything from the global context ──────────────────
     const {
         company, setCompany,
         loading,
@@ -83,7 +86,7 @@ export default function RunPipeline() {
         stopPipeline,
     } = usePipeline();
 
-    // ── Local-only UI state (fine to reset on navigation) ────────
+    // ── Local-only UI state ──────────────────────────────────────
     const [pdfLoading, setPdfLoading] = useState(false);
     const [sourcesExpanded, setSourcesExpanded] = useState(false);
     const [filterCategory, setFilterCategory] = useState('all');
@@ -91,7 +94,14 @@ export default function RunPipeline() {
     const [sortBy, setSortBy] = useState('confidence');
     const [expandedSignals, setExpandedSignals] = useState(new Set());
 
-    // Prevent duplicate auto-runs when navigated here via location.state
+    // RAG / sidebar state
+    const [ragMessages, setRagMessages] = useState([]);   // [{ role: 'user'|'ai', text, sources? }]
+    const [ragQuestion, setRagQuestion] = useState('');
+    const [ragLoading, setRagLoading] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const ragInputRef = useRef(null);
+    const ragScrollRef = useRef(null);
+
     const lastAutoRunCompanyRef = useRef('');
 
     const toggleSignal = useCallback((idx) => {
@@ -104,6 +114,13 @@ export default function RunPipeline() {
     }, []);
 
     const report = result?.report || result;
+
+    // Auto-scroll RAG messages
+    useEffect(() => {
+        if (ragScrollRef.current) {
+            ragScrollRef.current.scrollTop = ragScrollRef.current.scrollHeight;
+        }
+    }, [ragMessages, ragLoading]);
 
     const handleDownloadPDF = async () => {
         if (!report) return;
@@ -121,6 +138,7 @@ export default function RunPipeline() {
         setExpandedSignals(new Set());
         setFilterCategory('all');
         setFilterConfidence('all');
+        setRagMessages([]);
         await executePipeline(company);
     };
 
@@ -201,299 +219,468 @@ export default function RunPipeline() {
     const strategicDirections = useMemo(() =>
         deriveStrategicDirections(report?.features), [report]);
 
+    // ── RAG handler — multi-turn ─────────────────────────────────
+    const handleAskReport = async () => {
+        const q = ragQuestion.trim();
+        if (!q || ragLoading) return;
+
+        setRagMessages(prev => [...prev, { role: 'user', text: q }]);
+        setRagQuestion('');
+        setRagLoading(true);
+
+        try {
+            const res = await askRagQuestion(q);
+            setRagMessages(prev => [
+                ...prev,
+                { role: 'ai', text: res.answer, sources: res.sources || [] }
+            ]);
+        } catch {
+            setRagMessages(prev => [
+                ...prev,
+                { role: 'ai', text: 'Unable to generate an answer. Please try again.', sources: [] }
+            ]);
+        } finally {
+            setRagLoading(false);
+            ragInputRef.current?.focus();
+        }
+    };
+
+    const handleRagKeyDown = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleAskReport();
+        }
+    };
+
+    // Suggested starter questions
+    const STARTER_QUESTIONS = [
+        'What are the top strategic risks?',
+        'Summarise the key AI signals',
+        'Which signals have highest confidence?',
+        'What competitive threats exist?',
+    ];
+
+    const hasResults = !!(result && report);
+
     return (
-        <div className="intelligence-page fade-in">
+        /* Outer wrapper splits page into [main | sidebar] when results are shown */
+        <div className={`intelligence-page fade-in ${hasResults ? 'with-sidebar' : ''}`}>
 
-            {/* ── Header ─────────────────────────────────────── */}
-            <div className="page-header">
-                <h1>Intelligence</h1>
-                <p>Analyze a company's competitive landscape — discover verified technical signals from the past {settings.analysis.timeWindow} days</p>
-            </div>
+            {/* ══════════════════════════════════════════════════════
+                MAIN COLUMN
+            ══════════════════════════════════════════════════════ */}
+            <div className="intel-main-col">
 
-            {/* ── Input Area ──────────────────────────────────── */}
-            <form className="intel-input-section card" onSubmit={handleRun}>
-                <div className="intel-input-row">
-                    <div className="intel-input-wrapper">
-                        <HiOutlineLightningBolt className="intel-input-icon" />
-                        <input
-                            type="text"
-                            className="input intel-input"
-                            placeholder="Enter a company name to analyze..."
-                            value={company}
-                            onChange={e => setCompany(e.target.value)}
-                            disabled={loading}
-                            maxLength={200}
-                        />
-                    </div>
-                    <button
-                        type="submit"
-                        className="btn btn-primary btn-lg intel-run-btn"
-                        disabled={loading || !company.trim()}
-                    >
-                        {loading ? (
-                            <><span className="spinner" /> Analyzing...</>
-                        ) : (
-                            <><HiOutlineLightningBolt /> Analyze</>
+                {/* ── Header ─────────────────────────────────────── */}
+                <div className="page-header">
+                    <h1>Intelligence</h1>
+                    <p>Analyze a company's competitive landscape — discover verified technical signals from the past {settings.analysis.timeWindow} days</p>
+                </div>
+
+                {/* ── Input Area ──────────────────────────────────── */}
+                <form className="intel-input-section card" onSubmit={handleRun}>
+                    <div className="intel-input-row">
+                        <div className="intel-input-wrapper">
+                            <HiOutlineLightningBolt className="intel-input-icon" />
+                            <input
+                                type="text"
+                                className="input intel-input"
+                                placeholder="Enter a company name to analyze..."
+                                value={company}
+                                onChange={e => setCompany(e.target.value)}
+                                disabled={loading}
+                                maxLength={200}
+                            />
+                        </div>
+                        <button
+                            type="submit"
+                            className="btn btn-primary btn-lg intel-run-btn"
+                            disabled={loading || !company.trim()}
+                        >
+                            {loading ? (
+                                <><span className="spinner" /> Analyzing...</>
+                            ) : (
+                                <><HiOutlineLightningBolt /> Analyze</>
+                            )}
+                        </button>
+                        {loading && (
+                            <button
+                                type="button"
+                                className="btn btn-danger btn-lg intel-stop-btn"
+                                onClick={stopPipeline}
+                            >
+                                <HiOutlineXCircle /> Stop
+                            </button>
                         )}
-                    </button>
-                    {loading && (
-                        <button
-                            type="button"
-                            className="btn btn-danger btn-lg intel-stop-btn"
-                            onClick={stopPipeline}
-                        >
-                            <HiOutlineXCircle /> Stop
-                        </button>
-                    )}
-                </div>
-
-                <div className="intel-suggestions">
-                    {SUGGESTIONS.map(s => (
-                        <button
-                            key={s}
-                            type="button"
-                            className="suggestion-chip"
-                            onClick={() => setCompany(s)}
-                            disabled={loading}
-                        >
-                            {s}
-                        </button>
-                    ))}
-                </div>
-            </form>
-
-            {/* ── Pipeline Animation (reads from context — survives tab switch) ── */}
-            {loading && (
-                <PipelineAnimation
-                    company={company}
-                    activeStage={activeStage}
-                    elapsed={elapsed}
-                />
-            )}
-
-            {/* ── Error ──────────────────────────────────────── */}
-            {error && (
-                <div className="card error-section fade-in">
-                    <HiOutlineExclamationCircle className="error-icon" />
-                    <div>
-                        <h3>Analysis Failed</h3>
-                        <p>{error}</p>
                     </div>
-                </div>
-            )}
 
-            {/* ── Results ────────────────────────────────────── */}
-            {result && report && (
-                <div className="results-section fade-in-up">
-
-                    <div className="card result-header-card">
-                        <div className="result-header-row">
-                            <div className="result-meta">
-                                <h2>{report.company_name || company}</h2>
-                                <div className="result-badges">
-                                    <span className="badge badge-accent">{report.total_features_verified || report.features?.length || 0} Signals</span>
-                                    <span className="badge badge-info">{report.total_sources_analysed || 0} Sources</span>
-                                    {distribution.length > 0 && <span className="badge badge-purple">{distribution.length} Themes</span>}
-                                    {report.generated_at && (
-                                        <span className="badge badge-warning">{new Date(report.generated_at).toLocaleDateString()}</span>
-                                    )}
-                                </div>
-                            </div>
+                    <div className="intel-suggestions">
+                        {SUGGESTIONS.map(s => (
                             <button
-                                className="btn btn-pdf"
-                                onClick={handleDownloadPDF}
-                                disabled={pdfLoading || loading}
-                                title="Download report as PDF"
-                                id="download-pdf-btn"
+                                key={s}
+                                type="button"
+                                className="suggestion-chip"
+                                onClick={() => setCompany(s)}
+                                disabled={loading}
                             >
-                                {pdfLoading ? (
-                                    <><span className="spinner spinner-sm" /> Generating…</>
-                                ) : (
-                                    <><HiOutlineDownload /> Download PDF</>
-                                )}
+                                {s}
                             </button>
+                        ))}
+                    </div>
+                </form>
+
+                {/* ── Pipeline Animation ──────────────────────────── */}
+                {loading && (
+                    <PipelineAnimation
+                        company={company}
+                        activeStage={activeStage}
+                        elapsed={elapsed}
+                    />
+                )}
+
+                {/* ── Error ──────────────────────────────────────── */}
+                {error && (
+                    <div className="card error-section fade-in">
+                        <HiOutlineExclamationCircle className="error-icon" />
+                        <div>
+                            <h3>Analysis Failed</h3>
+                            <p>{error}</p>
                         </div>
                     </div>
+                )}
 
-                    {(report.executive_summary || distribution.length > 0) && (
-                        <div className="insight-grid fade-in-up">
-                            {report.executive_summary && (
-                                <div className="card card-accent executive-card">
-                                    <div className="executive-label">Executive Insight</div>
-                                    <p className="executive-text">{report.executive_summary}</p>
-                                    <div className="executive-stats">
-                                        <div className="exec-stat">
-                                            <span className="exec-stat-value">{report.features?.length || 0}</span>
-                                            <span className="exec-stat-label">Signals</span>
-                                        </div>
-                                        <div className="exec-stat">
-                                            <span className="exec-stat-value">{report.total_sources_analysed || 0}</span>
-                                            <span className="exec-stat-label">Sources</span>
-                                        </div>
-                                        <div className="exec-stat">
-                                            <span className={`exec-stat-value ${avgConfidence >= 0.7 ? 'text-success' : avgConfidence >= 0.4 ? 'text-warning' : 'text-error'}`}>
-                                                {(avgConfidence * 100).toFixed(0)}%
-                                            </span>
-                                            <span className="exec-stat-label">Avg Confidence</span>
-                                        </div>
+                {/* ── Results ────────────────────────────────────── */}
+                {hasResults && (
+                    <div className="results-section fade-in-up">
+
+                        <div className="card result-header-card">
+                            <div className="result-header-row">
+                                <div className="result-meta">
+                                    <h2>{report.company_name || company}</h2>
+                                    <div className="result-badges">
+                                        <span className="badge badge-accent">{report.total_features_verified || report.features?.length || 0} Signals</span>
+                                        <span className="badge badge-info">{report.total_sources_analysed || 0} Sources</span>
+                                        {distribution.length > 0 && <span className="badge badge-purple">{distribution.length} Themes</span>}
+                                        {report.generated_at && (
+                                            <span className="badge badge-warning">{new Date(report.generated_at).toLocaleDateString()}</span>
+                                        )}
                                     </div>
-                                    {strategicDirections.length > 0 && (
-                                        <div className="strategic-directions">
-                                            <span className="strategic-label">Strategic Direction</span>
-                                            <div className="strategic-tags">
-                                                {strategicDirections.map((d, i) => (
-                                                    <span key={i} className="strategic-tag">{d}</span>
-                                                ))}
+                                </div>
+                                <button
+                                    className="btn btn-pdf"
+                                    onClick={handleDownloadPDF}
+                                    disabled={pdfLoading || loading}
+                                    title="Download report as PDF"
+                                    id="download-pdf-btn"
+                                >
+                                    {pdfLoading ? (
+                                        <><span className="spinner spinner-sm" /> Generating…</>
+                                    ) : (
+                                        <><HiOutlineDownload /> Download PDF</>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
+                        {(report.executive_summary || distribution.length > 0) && (
+                            <div className="insight-grid fade-in-up">
+                                {report.executive_summary && (
+                                    <div className="card card-accent executive-card">
+                                        <div className="executive-label">Executive Insight</div>
+                                        <p className="executive-text">{report.executive_summary}</p>
+                                        <div className="executive-stats">
+                                            <div className="exec-stat">
+                                                <span className="exec-stat-value">{report.features?.length || 0}</span>
+                                                <span className="exec-stat-label">Signals</span>
+                                            </div>
+                                            <div className="exec-stat">
+                                                <span className="exec-stat-value">{report.total_sources_analysed || 0}</span>
+                                                <span className="exec-stat-label">Sources</span>
+                                            </div>
+                                            <div className="exec-stat">
+                                                <span className={`exec-stat-value ${avgConfidence >= 0.7 ? 'text-success' : avgConfidence >= 0.4 ? 'text-warning' : 'text-error'}`}>
+                                                    {(avgConfidence * 100).toFixed(0)}%
+                                                </span>
+                                                <span className="exec-stat-label">Avg Confidence</span>
                                             </div>
                                         </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {distribution.length > 0 && (
-                                <div className="card distribution-card">
-                                    <div className="distribution-label">Signal Distribution</div>
-                                    <div className="distribution-bars">
-                                        {distribution.map((d, i) => (
-                                            <div key={i} className="dist-row">
-                                                <span className={`dist-cat insight-tag ${d.tag}`}>{d.category}</span>
-                                                <div className="dist-bar-track">
-                                                    <div
-                                                        className={`dist-bar-fill tag-${d.tag}`}
-                                                        style={{ width: `${d.pct}%` }}
-                                                    />
+                                        {strategicDirections.length > 0 && (
+                                            <div className="strategic-directions">
+                                                <span className="strategic-label">Strategic Direction</span>
+                                                <div className="strategic-tags">
+                                                    {strategicDirections.map((d, i) => (
+                                                        <span key={i} className="strategic-tag">{d}</span>
+                                                    ))}
                                                 </div>
-                                                <span className="dist-count">{d.count}</span>
                                             </div>
-                                        ))}
+                                        )}
                                     </div>
-                                    <div className="dist-confidence">
-                                        <div className="dist-conf-header">
-                                            <span className="dist-conf-label">Avg Confidence</span>
-                                            <span className={`dist-conf-value ${avgConfidence >= 0.7 ? 'high' : avgConfidence >= 0.4 ? 'mid' : 'low'}`}>
-                                                {(avgConfidence * 100).toFixed(0)}%
-                                            </span>
+                                )}
+
+                                {distribution.length > 0 && (
+                                    <div className="card distribution-card">
+                                        <div className="distribution-label">Signal Distribution</div>
+                                        <div className="distribution-bars">
+                                            {distribution.map((d, i) => (
+                                                <div key={i} className="dist-row">
+                                                    <span className={`dist-cat insight-tag ${d.tag}`}>{d.category}</span>
+                                                    <div className="dist-bar-track">
+                                                        <div
+                                                            className={`dist-bar-fill tag-${d.tag}`}
+                                                            style={{ width: `${d.pct}%` }}
+                                                        />
+                                                    </div>
+                                                    <span className="dist-count">{d.count}</span>
+                                                </div>
+                                            ))}
                                         </div>
-                                        <div className="dist-conf-track">
-                                            <div
-                                                className={`dist-conf-fill ${avgConfidence >= 0.7 ? 'high' : avgConfidence >= 0.4 ? 'mid' : 'low'}`}
-                                                style={{ width: `${(avgConfidence * 100).toFixed(0)}%` }}
-                                            />
+                                        <div className="dist-confidence">
+                                            <div className="dist-conf-header">
+                                                <span className="dist-conf-label">Avg Confidence</span>
+                                                <span className={`dist-conf-value ${avgConfidence >= 0.7 ? 'high' : avgConfidence >= 0.4 ? 'mid' : 'low'}`}>
+                                                    {(avgConfidence * 100).toFixed(0)}%
+                                                </span>
+                                            </div>
+                                            <div className="dist-conf-track">
+                                                <div
+                                                    className={`dist-conf-fill ${avgConfidence >= 0.7 ? 'high' : avgConfidence >= 0.4 ? 'mid' : 'low'}`}
+                                                    style={{ width: `${(avgConfidence * 100).toFixed(0)}%` }}
+                                                />
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {report.features?.length > 0 && (
-                        <div className="filter-bar fade-in-up">
-                            <div className="filter-controls">
-                                <div className="filter-group">
-                                    <HiOutlineFilter className="filter-icon" />
-                                    <select
-                                        className="filter-select"
-                                        value={filterCategory}
-                                        onChange={e => setFilterCategory(e.target.value)}
-                                    >
-                                        <option value="all">All Themes</option>
-                                        {allCategories.map(c => (
-                                            <option key={c} value={c}>{c}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="filter-group">
-                                    <select
-                                        className="filter-select"
-                                        value={filterConfidence}
-                                        onChange={e => setFilterConfidence(e.target.value)}
-                                    >
-                                        <option value="all">All Confidence</option>
-                                        <option value="high">High (≥70%)</option>
-                                        <option value="mid">Medium (40-69%)</option>
-                                        <option value="low">Low (&lt;40%)</option>
-                                    </select>
-                                </div>
-                                <div className="filter-group">
-                                    <HiOutlineSortDescending className="filter-icon" />
-                                    <select
-                                        className="filter-select"
-                                        value={sortBy}
-                                        onChange={e => setSortBy(e.target.value)}
-                                    >
-                                        <option value="confidence">Sort: Confidence ↓</option>
-                                        <option value="category">Sort: Category</option>
-                                    </select>
-                                </div>
+                                )}
                             </div>
-                            <span className="filter-count">
-                                Showing {filteredSignals.length} of {report.features.length} signals
-                            </span>
-                        </div>
-                    )}
+                        )}
 
-                    {filteredSignals.length > 0 && (
-                        <div className="signals-section">
-                            <div className="signals-list stagger">
-                                {filteredSignals.map((f, i) => (
-                                    <SignalCard
-                                        key={`${f.title}-${i}`}
-                                        signal={f}
-                                        index={i}
-                                        isExpanded={expandedSignals.has(i)}
-                                        onToggle={() => toggleSignal(i)}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {filteredSignals.length === 0 && report.features?.length > 0 && (
-                        <div className="card empty-state">
-                            <div className="icon">🔍</div>
-                            <h3>No signals match your filters</h3>
-                            <p>Try adjusting the category or confidence filters above.</p>
-                        </div>
-                    )}
-
-                    {report.all_sources && report.all_sources.length > 0 && (
-                        <div className="card evidence-section fade-in-up">
-                            <button
-                                className="evidence-toggle"
-                                onClick={() => setSourcesExpanded(!sourcesExpanded)}
-                            >
-                                <span>
-                                    Evidence Layer
-                                    <span className="evidence-count">{report.all_sources.length} sources</span>
-                                </span>
-                                {sourcesExpanded ? <HiOutlineChevronUp /> : <HiOutlineChevronDown />}
-                            </button>
-                            {sourcesExpanded && (
-                                <div className="evidence-list fade-in">
-                                    {report.all_sources.map((url, i) => (
-                                        <a
-                                            key={i}
-                                            href={url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="evidence-item"
+                        {report.features?.length > 0 && (
+                            <div className="filter-bar fade-in-up">
+                                <div className="filter-controls">
+                                    <div className="filter-group">
+                                        <HiOutlineFilter className="filter-icon" />
+                                        <select
+                                            className="filter-select"
+                                            value={filterCategory}
+                                            onChange={e => setFilterCategory(e.target.value)}
                                         >
-                                            <HiOutlineExternalLink className="evidence-link-icon" />
-                                            <span>{url.length > 90 ? url.slice(0, 90) + '...' : url}</span>
-                                        </a>
+                                            <option value="all">All Themes</option>
+                                            {allCategories.map(c => (
+                                                <option key={c} value={c}>{c}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="filter-group">
+                                        <select
+                                            className="filter-select"
+                                            value={filterConfidence}
+                                            onChange={e => setFilterConfidence(e.target.value)}
+                                        >
+                                            <option value="all">All Confidence</option>
+                                            <option value="high">High (≥70%)</option>
+                                            <option value="mid">Medium (40-69%)</option>
+                                            <option value="low">Low (&lt;40%)</option>
+                                        </select>
+                                    </div>
+                                    <div className="filter-group">
+                                        <HiOutlineSortDescending className="filter-icon" />
+                                        <select
+                                            className="filter-select"
+                                            value={sortBy}
+                                            onChange={e => setSortBy(e.target.value)}
+                                        >
+                                            <option value="confidence">Sort: Confidence ↓</option>
+                                            <option value="category">Sort: Category</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <span className="filter-count">
+                                    Showing {filteredSignals.length} of {report.features.length} signals
+                                </span>
+                            </div>
+                        )}
+
+                        {filteredSignals.length > 0 && (
+                            <div className="signals-section">
+                                <div className="signals-list stagger">
+                                    {filteredSignals.map((f, i) => (
+                                        <SignalCard
+                                            key={`${f.title}-${i}`}
+                                            signal={f}
+                                            index={i}
+                                            isExpanded={expandedSignals.has(i)}
+                                            onToggle={() => toggleSignal(i)}
+                                            onAsk={(text) => {
+                                                setRagQuestion(text);
+                                                setSidebarOpen(true);
+                                                setTimeout(() => ragInputRef.current?.focus(), 100);
+                                            }}
+                                        />
                                     ))}
                                 </div>
-                            )}
+                            </div>
+                        )}
+
+                        {filteredSignals.length === 0 && report.features?.length > 0 && (
+                            <div className="card empty-state">
+                                <div className="icon">🔍</div>
+                                <h3>No signals match your filters</h3>
+                                <p>Try adjusting the category or confidence filters above.</p>
+                            </div>
+                        )}
+
+                        {report.all_sources && report.all_sources.length > 0 && (
+                            <div className="card evidence-section fade-in-up">
+                                <button
+                                    className="evidence-toggle"
+                                    onClick={() => setSourcesExpanded(!sourcesExpanded)}
+                                >
+                                    <span>
+                                        Evidence Layer
+                                        <span className="evidence-count">{report.all_sources.length} sources</span>
+                                    </span>
+                                    {sourcesExpanded ? <HiOutlineChevronUp /> : <HiOutlineChevronDown />}
+                                </button>
+                                {sourcesExpanded && (
+                                    <div className="evidence-list fade-in">
+                                        {report.all_sources.map((url, i) => (
+                                            <a
+                                                key={i}
+                                                href={url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="evidence-item"
+                                            >
+                                                <HiOutlineExternalLink className="evidence-link-icon" />
+                                                <span>{url.length > 90 ? url.slice(0, 90) + '...' : url}</span>
+                                            </a>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                    </div>
+                )}
+            </div>
+
+            {/* ══════════════════════════════════════════════════════
+                STICKY AI SIDEBAR — only rendered when results exist
+            ══════════════════════════════════════════════════════ */}
+            {hasResults && (
+                <aside className={`rag-sidebar ${sidebarOpen ? 'open' : 'collapsed'}`}>
+
+                    {/* Sidebar Header */}
+                    <div className="rag-sidebar-header">
+                        <div className="rag-sidebar-title">
+                            <HiOutlineSparkles className="rag-sparkle-icon" />
+                            <span>Ask AI</span>
+                            <span className="rag-sidebar-company">{report.company_name || company}</span>
                         </div>
+                        <button
+                            className="rag-collapse-btn"
+                            onClick={() => setSidebarOpen(v => !v)}
+                            title={sidebarOpen ? 'Collapse' : 'Expand'}
+                        >
+                            {sidebarOpen ? <HiOutlineChevronDown /> : <HiOutlineChatAlt2 />}
+                        </button>
+                    </div>
+
+                    {sidebarOpen && (
+                        <>
+                            {/* Messages area */}
+                            <div className="rag-messages" ref={ragScrollRef}>
+                                {ragMessages.length === 0 ? (
+                                    <div className="rag-empty-state">
+                                        <div className="rag-empty-icon">
+                                            <HiOutlineChatAlt2 />
+                                        </div>
+                                        <p className="rag-empty-title">Ask anything about this report</p>
+                                        <p className="rag-empty-sub">I have full context of all signals, sources and insights.</p>
+                                        <div className="rag-starter-questions">
+                                            {STARTER_QUESTIONS.map((q, i) => (
+                                                <button
+                                                    key={i}
+                                                    className="rag-starter-chip"
+                                                    onClick={() => {
+                                                        setRagQuestion(q);
+                                                        ragInputRef.current?.focus();
+                                                    }}
+                                                >
+                                                    {q}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    ragMessages.map((msg, i) => (
+                                        <div key={i} className={`rag-msg rag-msg-${msg.role}`}>
+                                            {msg.role === 'ai' && (
+                                                <div className="rag-msg-avatar">
+                                                    <HiOutlineSparkles />
+                                                </div>
+                                            )}
+                                            <div className="rag-msg-bubble">
+                                                <p>{msg.text}</p>
+                                                {msg.sources?.length > 0 && (
+                                                    <div className="rag-msg-sources">
+                                                        <span className="rag-sources-label">Sources</span>
+                                                        {msg.sources.map((s, j) => (
+                                                            <div key={j} className="rag-source-chip">
+                                                                {s.text?.slice(0, 180)}…
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+
+                                {ragLoading && (
+                                    <div className="rag-msg rag-msg-ai">
+                                        <div className="rag-msg-avatar">
+                                            <HiOutlineSparkles />
+                                        </div>
+                                        <div className="rag-msg-bubble rag-thinking">
+                                            <span className="rag-dot" />
+                                            <span className="rag-dot" />
+                                            <span className="rag-dot" />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Input row */}
+                            <div className="rag-input-area">
+                                <input
+                                    ref={ragInputRef}
+                                    type="text"
+                                    className="input rag-sidebar-input"
+                                    placeholder="Ask about signals, trends, risks…"
+                                    value={ragQuestion}
+                                    onChange={e => setRagQuestion(e.target.value)}
+                                    onKeyDown={handleRagKeyDown}
+                                    disabled={ragLoading}
+                                />
+                                <button
+                                    className="rag-send-btn"
+                                    onClick={handleAskReport}
+                                    disabled={ragLoading || !ragQuestion.trim()}
+                                    title="Send"
+                                >
+                                    <HiOutlinePaperAirplane />
+                                </button>
+                            </div>
+                        </>
                     )}
-                </div>
+                </aside>
             )}
         </div>
     );
 }
 
 /* ── Signal Card ────────────────────────────────────────────────── */
-function SignalCard({ signal: f, index, isExpanded, onToggle }) {
+function SignalCard({ signal: f, index, isExpanded, onToggle, onAsk }) {
     const score = f.confidence_score ?? f.confidence;
     const pct = score != null ? Math.round(score * 100) : null;
     const level = score >= 0.7 ? 'high' : score >= 0.4 ? 'mid' : 'low';
@@ -547,6 +734,16 @@ function SignalCard({ signal: f, index, isExpanded, onToggle }) {
                         {f.source_count && (
                             <span className="signal-meta">{f.source_count} source{f.source_count > 1 ? 's' : ''}</span>
                         )}
+                        {/* Ask AI about this signal */}
+                        <button
+                            className="signal-ask-ai-btn"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onAsk(`Tell me more about: ${f.title || f.feature_title}`);
+                            }}
+                        >
+                            <HiOutlineSparkles /> Ask AI
+                        </button>
                         {f.source_url && (
                             <a
                                 href={f.source_url}
@@ -564,7 +761,7 @@ function SignalCard({ signal: f, index, isExpanded, onToggle }) {
     );
 }
 
-/* ── Pipeline Animation — now receives stage/elapsed as props ───── */
+/* ── Pipeline Animation ─────────────────────────────────────────── */
 function PipelineAnimation({ company, activeStage, elapsed }) {
     const formatTime = (s) => {
         const m = Math.floor(s / 60);

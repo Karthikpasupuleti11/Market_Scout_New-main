@@ -12,7 +12,6 @@ import Reports from './pages/Reports';
 import Competitors from './pages/Competitors';
 import Schedule from './pages/Schedule';
 import About from './pages/About';
-import RagChat from './pages/RagChat';
 
 
 function TopBar({ onStartTour }) {
@@ -79,7 +78,6 @@ function AppContent() {
             <Route path="/about" element={<About />} />
             <Route path="/run" element={<RunPipeline />} />
             <Route path="/competitors" element={<Competitors />} />
-            <Route path="/rag" element={<RagChat />} />
           </Routes>
         </main>
       </div>

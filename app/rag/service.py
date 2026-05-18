@@ -43,6 +43,101 @@ def load_store():
     store.deserialize(data)
     return store
 
+async def process_report(report: dict):
+
+    print("PROCESS REPORT STARTED")
+
+    sections = []
+
+    # ── Executive Summary ─────────────────────────
+
+    sections.append(
+        f"""
+Company:
+{report.get('company_name', '')}
+
+Executive Summary:
+{report.get('executive_summary', '')}
+"""
+    )
+
+    # ── Features ─────────────────────────────────
+
+    for feature in report.get("features", []):
+
+        metrics = feature.get("key_metrics") or []
+
+        # Safe handling
+        if not isinstance(metrics, list):
+            metrics = [str(metrics)]
+
+        section = f"""
+Feature Title:
+{feature.get('title', '')}
+
+Description:
+{feature.get('description', '')}
+
+Category:
+{feature.get('category', '')}
+
+Impact:
+{feature.get('impact_assessment', '')}
+
+Metrics:
+{', '.join(metrics)}
+"""
+
+        sections.append(section)
+
+    # ── Final Text ───────────────────────────────
+
+    full_text = "\n\n".join(sections).strip()
+
+    if not full_text:
+        raise Exception("Empty report text")
+
+    # ── Chunking ─────────────────────────────────
+
+    chunks = chunk_text(full_text)
+
+    all_chunks = []
+
+    for c in chunks:
+
+        all_chunks.append({
+            "text": c["text"],
+            "page": "report"
+        })
+
+    print(f"TOTAL CHUNKS: {len(all_chunks)}")
+
+    # ── Embeddings ───────────────────────────────
+
+    embeddings = embed(
+        [c["text"] for c in all_chunks]
+    )
+
+    # ── Vector Store ─────────────────────────────
+
+    store = VectorStore()
+
+    store.build(
+        embeddings,
+        all_chunks
+    )
+
+    # ── Redis Save ───────────────────────────────
+
+    redis = get_redis()
+
+    redis.set(
+        REDIS_KEY,
+        store.serialize(),
+        ex=3600
+    )
+
+    print("RAG INDEX STORED SUCCESSFULLY")
 
 async def ask_question(query: str):
     store = load_store()
