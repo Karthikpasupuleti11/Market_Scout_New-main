@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     LLM_RPM_PER_KEY: int = int(os.getenv("LLM_RPM_PER_KEY", "40"))
     LLM_GLOBAL_PIPELINE_LIMIT: int = int(os.getenv("LLM_GLOBAL_PIPELINE_LIMIT", "3"))
     LLM_PROMPT_CACHE_TTL: int = int(os.getenv("LLM_PROMPT_CACHE_TTL", "86400"))
+    # Batched article LLM calls (articles per request; 1 = legacy per-article)
+    LLM_BATCH_CONTENT_FILTER: int = int(os.getenv("LLM_BATCH_CONTENT_FILTER", "8"))
+    LLM_BATCH_AUTHORITY: int = int(os.getenv("LLM_BATCH_AUTHORITY", "8"))
+    LLM_BATCH_FEATURE_EXTRACTION: int = int(os.getenv("LLM_BATCH_FEATURE_EXTRACTION", "2"))
 
     # ── Search ─────────────────────────────────────────────────────
     TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")

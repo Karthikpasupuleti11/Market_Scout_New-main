@@ -21,13 +21,16 @@
   right: 0;
   bottom: 0;
   width: 520px;
-  max-width: 92vw;
+  max-width: min(92vw, 100% - env(safe-area-inset-left));
+  max-height: 100vh;
+  max-height: 100dvh;
   background: #FFFFFF;
   border-left: 1px solid var(--border-subtle);
   box-shadow: -12px 0 48px rgba(15, 23, 42, 0.12);
   z-index: 950;
   display: flex;
   flex-direction: column;
+  min-height: 0;
   animation: slideInPanel 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -95,7 +98,10 @@
 .settings-content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
   padding: 24px 28px;
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
   background: #F8FAFC; /* Added to contrast with cards */
 }
 

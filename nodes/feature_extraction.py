@@ -1,41 +1,27 @@
 """
 Market Intelligence Scout — Feature Extraction Agent
 
-Why an Agent? Semantic reasoning is required to:
-  • Distinguish technical features from marketing claims
-  • Make non-deterministic judgments about feature significance
-  • Generate structured output from unstructured text
-  • Ground extraction in evidence (direct quotes)
-
-Redis caching:
-  • Key: URL hash
-  • Avoids re-processing on retries
-  • TTL: 6 hours
+Batched LLM extraction: multiple articles per completion when possible.
+Per-URL Redis cache unchanged. Falls back to one article per call on batch failure.
 """
 
 import json
 import re
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 from graph.state import GraphState
 from llm.nvidia_client import invoke_llm
 from cache.redis_client import make_cache_key, get_cache, set_cache
+from nodes.llm_article_batches import chunk_list, parse_json_object
 
 logger = logging.getLogger(__name__)
 
-MAX_PARALLEL = 10
+_BATCH_TEXT_CHARS = 4500
 
-
-# ────────────────────────────────────────────────────────────────────
-# JSON Extraction
-# ────────────────────────────────────────────────────────────────────
 
 def _clean_json_response(raw: str) -> str:
-    """Strip markdown fences and isolate JSON array."""
     cleaned = re.sub(r"```json\s?|\s?```", "", raw).strip()
-    # Find the outermost array
     start = cleaned.find("[")
     end = cleaned.rfind("]") + 1
     if start != -1 and end > start:
@@ -43,47 +29,155 @@ def _clean_json_response(raw: str) -> str:
     return cleaned
 
 
-# ────────────────────────────────────────────────────────────────────
-# Node Entry Point
-# ────────────────────────────────────────────────────────────────────
-
 def feature_extraction_node(state: GraphState) -> Dict[str, Any]:
     """
     Feature Extraction Agent — extracts structured technical features.
 
     Input:  state["filtered_results"] (from Content Filter)
     Output: state["extracted_features"]
-
-    Each feature includes:
-      - feature_summary
-      - category
-      - metrics
-      - confidence
-      - evidence (grounding quote)
-      - source_authority
-      - url
-      - publish_date
     """
     filtered = state.get("filtered_results", [])
     company_name = state.get("company_name", "")
-    logger.info("FEATURE EXTRACTION — Processing %d articles for '%s'", len(filtered), company_name)
+    logger.info(
+        "FEATURE EXTRACTION — Processing %d articles for '%s'",
+        len(filtered),
+        company_name,
+    )
 
     if not filtered:
         logger.warning("FEATURE EXTRACTION — No articles to process")
         return {"extracted_features": []}
 
+    from app.config import settings
+
+    batch_size = max(1, settings.LLM_BATCH_FEATURE_EXTRACTION)
     all_features: List[Dict[str, Any]] = []
-    with ThreadPoolExecutor(max_workers=min(MAX_PARALLEL, len(filtered))) as pool:
-        futures = [pool.submit(_extract_one, art, company_name) for art in filtered]
-        for fut in as_completed(futures):
-            all_features.extend(fut.result() or [])
+
+    pending: List[Dict[str, Any]] = []
+    for art in filtered:
+        url = art.get("url", "")
+        cache_key = make_cache_key("features", url)
+        hit = get_cache(cache_key)
+        if hit is not None:
+            all_features.extend(hit if isinstance(hit, list) else [])
+        else:
+            pending.append(art)
+
+    for batch in chunk_list(pending, batch_size):
+        if len(batch) == 1:
+            all_features.extend(_extract_one(batch[0], company_name) or [])
+            continue
+        merged = _extract_batch(batch, company_name)
+        if merged is None:
+            for art in batch:
+                all_features.extend(_extract_one(art, company_name) or [])
+        else:
+            all_features.extend(merged)
 
     logger.info(
         "FEATURE EXTRACTION — Total features extracted: %d",
         len(all_features),
     )
-
     return {"extracted_features": all_features}
+
+
+def _extract_batch(
+    articles: List[Dict[str, Any]],
+    company_name: str,
+) -> List[Dict[str, Any]] | None:
+    """One LLM call for multiple articles, or None to trigger per-article fallback."""
+    blocks = []
+    for i, a in enumerate(articles):
+        url = (a.get("url") or "")[:800]
+        text = (a.get("article_text") or "")[:_BATCH_TEXT_CHARS]
+        blocks.append(f"### Article index {i}\nURL: {url}\nTEXT:\n{text}\n")
+
+    system_message = {
+        "role": "system",
+        "content": (
+            "You extract technical product features from multiple articles in one response. "
+            "Use ONLY text under each article's TEXT section. "
+            "If an article has no explicit technical changes, use an empty features array for that index. "
+            "NEVER invent features. Output ONLY valid JSON matching the schema — no markdown."
+        ),
+    }
+
+    user_prompt = f"""Company: {company_name}
+
+For EACH article (indices 0 through {len(articles) - 1}), extract features as JSON objects.
+Each feature must have:
+  "feature_summary", "feature_title", "category" (model_release|api_update|performance|capability|sdk_update|infrastructure|docs),
+  "metrics" (array of strings), "confidence" (number 0-1), "evidence" (short quote from that article's TEXT)
+
+ARTICLES:
+{chr(10).join(blocks)}
+
+Return ONLY this JSON object (no markdown):
+{{
+  "results": [
+    {{"index": 0, "features": [ ]}},
+    {{"index": 1, "features": [ ]}}
+  ]
+}}
+Include exactly one results entry per index from 0 to {len(articles) - 1}, in order."""
+
+    try:
+        from app.config import settings
+
+        response = invoke_llm(
+            [system_message, {"role": "user", "content": user_prompt}],
+            temperature=0.0,
+            max_tokens=settings.LLM_MAX_TOKENS,
+        )
+        root = parse_json_object(response)
+        rows = root.get("results")
+        if not isinstance(rows, list):
+            return None
+
+        by_index: Dict[int, List[Any]] = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            try:
+                idx = int(row.get("index", -1))
+            except (TypeError, ValueError):
+                continue
+            feats = row.get("features")
+            if isinstance(feats, list):
+                by_index[idx] = feats
+
+        flat: List[Dict[str, Any]] = []
+        for i, article in enumerate(articles):
+            url = article.get("url", "")
+            feats_raw = by_index.get(i)
+            if not isinstance(feats_raw, list):
+                return None
+            article_features: List[Dict[str, Any]] = []
+            for f in feats_raw:
+                if not isinstance(f, dict):
+                    continue
+                f = dict(f)
+                f["source_authority"] = article.get("authority_score", 0.5)
+                f["url"] = url
+                f["publish_date"] = article.get("publish_date")
+                article_features.append(f)
+                flat.append(f)
+            set_cache(make_cache_key("features", url), article_features)
+
+        logger.debug(
+            "FEATURE EXTRACTION — Batch OK: %d articles, %d features",
+            len(articles),
+            len(flat),
+        )
+        return flat
+
+    except Exception as exc:
+        logger.warning(
+            "FEATURE EXTRACTION — Batch error (%d articles): %s",
+            len(articles),
+            exc,
+        )
+        return None
 
 
 def _extract_one(article: Dict[str, Any], company_name: str) -> List[Dict[str, Any]]:
@@ -164,12 +258,17 @@ Return ONLY the JSON list. No preamble, no explanation."""
 
         logger.debug(
             "FEATURE EXTRACTION — Extracted %d features from: %s",
-            len(article_features), url[:60],
+            len(article_features),
+            url[:60],
         )
         return article_features
 
     except json.JSONDecodeError as exc:
-        logger.warning("FEATURE EXTRACTION — JSON parse error for %s: %s", url[:60], exc)
+        logger.warning(
+            "FEATURE EXTRACTION — JSON parse error for %s: %s",
+            url[:60],
+            exc,
+        )
         return []
     except Exception as exc:
         logger.warning("FEATURE EXTRACTION — Error for %s: %s", url[:60], exc)
@@ -177,6 +276,6 @@ Return ONLY the JSON list. No preamble, no explanation."""
 
 
 def settings_max_tokens() -> int:
-    """Import settings lazily to avoid circular imports."""
     from app.config import settings
+
     return settings.LLM_MAX_TOKENS

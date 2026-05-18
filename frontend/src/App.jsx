@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, NavLink, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, Link, Navigate } from 'react-router-dom';
 import { HiOutlineInformationCircle, HiOutlineQuestionMarkCircle } from 'react-icons/hi';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { PipelineProvider } from './contexts/PipelineContext';
@@ -75,6 +75,7 @@ function AppContent() {
             <Route path="/about" element={<About />} />
             <Route path="/run" element={<RunPipeline />} />
             <Route path="/competitors" element={<Competitors />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
       </div>
