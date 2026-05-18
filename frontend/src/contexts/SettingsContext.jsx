@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = {
   analysis: {
     timeWindow: 7,              // 7 | 14 | 30 days
     confidenceThreshold: 50,    // 50–90 slider (percentage)
+    forceRefresh: false,        // skip Redis/DB cache on next run
   },
 
   // ── 2. Watchlist ────────────────────────────────────────────────

@@ -21,7 +21,7 @@ from typing import Dict, Any, List
 
 from graph.state import GraphState
 from llm.nvidia_client import invoke_llm
-from cache.redis_client import make_cache_key, get_cache, set_cache
+from cache.report_cache import set_report_in_redis
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -74,13 +74,6 @@ def synthesis_node(state: GraphState) -> Dict[str, Any]:
         company_name, len(scored_features),
     )
 
-    # ── Cache check ────────────────────────────────────────────────
-    cache_key = make_cache_key("report", f"{company_name}:{date_window_days}d")
-    cached = get_cache(cache_key)
-    if cached:
-        logger.info("SYNTHESIS — Cache hit, returning cached report")
-        return {"synthesis_report": cached}
-
     # ── Handle empty features ──────────────────────────────────────
     if not scored_features:
         report = {
@@ -101,7 +94,7 @@ def synthesis_node(state: GraphState) -> Dict[str, Any]:
                 "date_window_days": date_window_days,
             },
         }
-        set_cache(cache_key, report)
+        set_report_in_redis(company_name, date_window_days, report)
         return {"synthesis_report": report}
 
     # ── Prepare feature data for LLM ──────────────────────────────
@@ -228,8 +221,8 @@ Return ONLY the JSON. No preamble."""
         },
     }
 
-    # ── Cache ──────────────────────────────────────────────────────
-    set_cache(cache_key, report)
+    # ── Cache (API reads Redis/DB before enqueue; this warms Redis after fresh runs)
+    set_report_in_redis(company_name, date_window_days, report)
 
     logger.info(
         "SYNTHESIS — Report generated: %d features, %d sources",

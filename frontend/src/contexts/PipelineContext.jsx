@@ -25,7 +25,7 @@ const NODE_TO_STAGE = {
 const PipelineContext = createContext(null);
 
 export function PipelineProvider({ children }) {
-    const { settings } = useSettings();
+    const { settings, updateAnalysis } = useSettings();
     const { addNotification } = useNotifications();
 
     // ── Core execution state ─────────────────────────────────────
@@ -79,9 +79,11 @@ export function PipelineProvider({ children }) {
             const data = await submitPipeline(companyName.trim(), {
                 signal: abortControllerRef.current.signal,
                 dateWindowDays: settings.analysis.timeWindow,
+                forceRefresh: settings.analysis.forceRefresh,
             });
 
             const taskId = data.task_id;
+            const pollIntervalMs = data.from_cache ? 250 : 2000;
             
             // Polling loop
             let isDone = false;
@@ -110,20 +112,31 @@ export function PipelineProvider({ children }) {
                 } else if (statusRes.status === 'SUCCESS') {
                     isDone = true;
                     setActiveStage(Object.keys(NODE_TO_STAGE).length);
+                    setCompletedStages(new Set(Object.values(NODE_TO_STAGE)));
                     setResult(statusRes.result);
                     const featureCount = statusRes.result?.features?.length || 0;
+                    const fromCache = statusRes.result?.from_cache || data.from_cache;
+                    const cacheSource = statusRes.result?.cache_source || data.cache_source;
+                    const hadForceRefresh = data.force_refresh || data.cache_invalidated;
                     addNotification(
                         'success',
                         `Analysis Complete: ${companyName.trim()}`,
-                        `Report generated with ${featureCount} signal${featureCount !== 1 ? 's' : ''} detected.`
+                        fromCache
+                            ? `Loaded cached report (${cacheSource || 'cache'}) with ${featureCount} signal${featureCount !== 1 ? 's' : ''}.`
+                            : hadForceRefresh
+                                ? `Fresh report generated (${featureCount} signal${featureCount !== 1 ? 's' : ''}) after clearing stored cache.`
+                                : `Report generated with ${featureCount} signal${featureCount !== 1 ? 's' : ''} detected.`
                     );
+                    if (settings.analysis.forceRefresh) {
+                        updateAnalysis({ forceRefresh: false });
+                    }
                 } else if (statusRes.status === 'FAILURE') {
                     isDone = true;
                     throw new Error(statusRes.error || 'Pipeline execution failed');
                 }
 
                 if (!isDone) {
-                    await new Promise(r => setTimeout(r, 2000));
+                    await new Promise(r => setTimeout(r, pollIntervalMs));
                 }
             }
         } catch (err) {
@@ -142,7 +155,7 @@ export function PipelineProvider({ children }) {
             stopClock();
             setLoading(false);
         }
-    }, [settings.analysis.timeWindow, startClock, stopClock, addNotification]);
+    }, [settings.analysis.timeWindow, settings.analysis.forceRefresh, updateAnalysis, startClock, stopClock, addNotification]);
 
     // ── Public: stop the running pipeline ────────────────────────
     const stopPipeline = useCallback(() => {

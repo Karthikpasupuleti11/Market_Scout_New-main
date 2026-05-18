@@ -114,42 +114,21 @@ def run_pipeline_task(self, company_name: str, date_window_days: int = 7):
             if db is not None:
                 db.close()
 
-        # ── Build serializable response ───────────────────────────
-        safe_features = []
-        for i, f in enumerate(features):
-            if isinstance(f, dict):
-                safe_features.append({
-                    "rank": f.get("rank", i + 1),
-                    "title": f.get("title") or f.get("feature_title") or f.get("feature_summary", ""),
-                    "description": f.get("description") or f.get("feature_summary") or f.get("feature_text", ""),
-                    "category": f.get("category"),
-                    "confidence_score": f.get("confidence_score") or f.get("confidence"),
-                    "impact_assessment": f.get("impact_assessment"),
-                    "source_url": f.get("source_url") or f.get("primary_url") or f.get("url"),
-                    "source_count": f.get("source_count"),
-                    "key_metrics": f.get("key_metrics") or f.get("metrics"),
-                })
+        from cache.report_cache import set_report_in_redis, build_task_response
 
-        raw_sources = report.get("all_sources") or []
-        safe_sources = [str(s) for s in raw_sources] if isinstance(raw_sources, list) else []
+        set_report_in_redis(company_name, date_window_days, report)
 
         elapsed_total = round(time.time() - start_time, 2)
-
-        response = {
-            "company_name": report.get("company_name", company_name),
-            "generated_at": report.get("generated_at", datetime.now(timezone.utc).isoformat()),
-            "executive_summary": report.get("executive_summary", "No summary available."),
-            "features": safe_features,
-            "total_sources_analysed": report.get("total_sources_analysed", 0),
-            "total_features_verified": report.get("total_features_verified", 0),
-            "all_sources": safe_sources,
-            "metadata": report.get("metadata"),
-            "elapsed_seconds": elapsed_total,
-        }
+        response = build_task_response(
+            report, company_name, elapsed_seconds=elapsed_total
+        )
 
         logger.info(
             "CELERY TASK %s — Complete: %d features, %d sources, %.1fs",
-            task_id, len(safe_features), response["total_sources_analysed"], elapsed_total,
+            task_id,
+            len(response["features"]),
+            response["total_sources_analysed"],
+            elapsed_total,
         )
 
         return response
@@ -173,4 +152,20 @@ def run_pipeline_task(self, company_name: str, date_window_days: int = 7):
 
         # Non-retryable — raise so Celery marks as FAILURE
         raise
+
+
+@celery_app.task(
+    name="celery_app.tasks.serve_cached_report_task",
+    acks_late=True,
+)
+def serve_cached_report_task(
+    report_response: dict,
+    cache_source: str = "redis",
+):
+    """Return a pre-built report payload (instant SUCCESS for cache hits)."""
+    logger.info("CELERY TASK — Serving cached report (source=%s)", cache_source)
+    out = dict(report_response)
+    out.setdefault("from_cache", True)
+    out.setdefault("cache_source", cache_source)
+    return out
 

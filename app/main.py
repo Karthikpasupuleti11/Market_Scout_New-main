@@ -69,6 +69,13 @@ class AgentRequest(BaseModel):
         description="Recency window (in days) used for date validation + scoring + synthesis",
         examples=[7, 14, 30],
     )
+    force_refresh: bool = Field(
+        False,
+        description=(
+            "If true, delete this company's cached report (Redis + DB, within "
+            "REPORT_CACHE_MAX_AGE) for the date window, then run a full pipeline"
+        ),
+    )
 
 
 class FeatureItem(BaseModel):
@@ -315,6 +322,100 @@ def dashboard_stats(db: Session = Depends(get_db)):
     }
 
 
+def _enqueue_pipeline_or_cache(
+    company_name: str,
+    date_window_days: int,
+    force_refresh: bool,
+) -> dict:
+    """Redis → DB cache lookup, or enqueue full Celery pipeline."""
+    from cache.report_cache import (
+        lookup_cached_report,
+        build_task_response,
+        sanitise_company_name,
+        invalidate_stored_report,
+    )
+    from celery_app.tasks import run_pipeline_task, serve_cached_report_task
+
+    company = sanitise_company_name(company_name)
+    if not company:
+        raise HTTPException(status_code=400, detail="Empty company name provided.")
+
+    cache_invalidated = None
+    if force_refresh:
+        db = SessionLocal()
+        try:
+            cache_invalidated = invalidate_stored_report(
+                db, company, date_window_days
+            )
+        finally:
+            db.close()
+        logger.info(
+            "API — Force refresh: cleared stored report for '%s' (%dd) %s",
+            company, date_window_days, cache_invalidated,
+        )
+
+    if not force_refresh:
+        db = SessionLocal()
+        try:
+            report, source = lookup_cached_report(db, company, date_window_days)
+        finally:
+            db.close()
+
+        if report and source:
+            payload = build_task_response(
+                report,
+                company,
+                elapsed_seconds=0.0,
+                from_cache=True,
+                cache_source=source,
+            )
+            task = serve_cached_report_task.delay(payload, cache_source=source)
+            logger.info(
+                "API — Cache hit (%s) for '%s' (%dd), task_id=%s",
+                source, company, date_window_days, task.id,
+            )
+            return {
+                "task_id": task.id,
+                "status": "PENDING",
+                "company_name": company,
+                "from_cache": True,
+                "cache_source": source,
+                "message": f"Cached report ({source}). Poll /task/{task.id} for results.",
+            }
+
+    from cache.redis_client import check_rate_limit
+    if not check_rate_limit(
+        "pipeline_global",
+        limit=settings.LLM_GLOBAL_PIPELINE_LIMIT,
+        window_seconds=120,
+    ):
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"Pipeline capacity reached (max {settings.LLM_GLOBAL_PIPELINE_LIMIT} "
+                "concurrent). Retry in ~2 min."
+            ),
+        )
+
+    logger.info("API — Pipeline enqueued for: '%s'", company)
+    task = run_pipeline_task.delay(
+        company_name=company,
+        date_window_days=date_window_days,
+    )
+    ACTIVE_PIPELINES.inc()
+    response = {
+        "task_id": task.id,
+        "status": "PENDING",
+        "company_name": company,
+        "from_cache": False,
+        "message": "Pipeline enqueued. Poll /task/{task_id} for progress.",
+    }
+    if cache_invalidated is not None:
+        response["cache_invalidated"] = cache_invalidated
+        response["force_refresh"] = True
+    return response
+
+
 @app.post(
     "/run-agent",
     tags=["Intelligence"],
@@ -324,36 +425,15 @@ async def run_agent(request: AgentRequest):
     """Enqueue the intelligence pipeline as a Celery task.
 
     Returns a task_id immediately. Poll /task/{task_id} for progress and results.
+
+    When a cached report exists (Redis, else PostgreSQL), returns quickly without
+    running the full pipeline unless force_refresh is true.
     """
-    # Global concurrency cap — prevents thundering herd against LLM rate limit.
-    from cache.redis_client import check_rate_limit
-    if not check_rate_limit(
-        "pipeline_global",
-        limit=settings.LLM_GLOBAL_PIPELINE_LIMIT,
-        window_seconds=120,
-    ):
-        raise HTTPException(
-            status_code=429,
-            detail=f"Pipeline capacity reached (max {settings.LLM_GLOBAL_PIPELINE_LIMIT} concurrent). Retry in ~2 min.",
-        )
-
-    logger.info("API — Pipeline enqueued for: '%s'", request.company_name)
-
-    from celery_app.tasks import run_pipeline_task
-    task = run_pipeline_task.delay(
-        company_name=request.company_name,
-        date_window_days=request.date_window_days,
+    return _enqueue_pipeline_or_cache(
+        request.company_name,
+        request.date_window_days,
+        request.force_refresh,
     )
-
-    # Track active pipeline in FastAPI's Prometheus registry
-    ACTIVE_PIPELINES.inc()
-
-    return {
-        "task_id": task.id,
-        "status": "PENDING",
-        "company_name": request.company_name,
-        "message": "Pipeline enqueued. Poll /task/{task_id} for progress.",
-    }
 
 
 class TaskStatusResponse(BaseModel):
@@ -400,7 +480,12 @@ async def get_task_status(task_id: str):
         response["result"] = result.result
 
         if _try_record_task_metrics(task_id):
-            ACTIVE_PIPELINES.dec()
+            cached = (
+                isinstance(result.result, dict)
+                and result.result.get("from_cache")
+            )
+            if not cached:
+                ACTIVE_PIPELINES.dec()
 
     elif result.status == "FAILURE":
         response["error"] = str(result.result) if result.result else "Task failed"
@@ -431,6 +516,58 @@ import threading
 )
 async def run_agent_stream(request: AgentRequest):
     """Execute the intelligence pipeline and stream progress events via SSE."""
+    from cache.report_cache import (
+        lookup_cached_report,
+        build_task_response,
+        sanitise_company_name,
+        invalidate_stored_report,
+    )
+
+    company = sanitise_company_name(request.company_name)
+    if not company:
+        raise HTTPException(status_code=400, detail="Empty company name provided.")
+
+    if request.force_refresh:
+        db = SessionLocal()
+        try:
+            invalidate_stored_report(db, company, request.date_window_days)
+        finally:
+            db.close()
+
+    if not request.force_refresh:
+        db = SessionLocal()
+        try:
+            report, source = lookup_cached_report(db, company, request.date_window_days)
+        finally:
+            db.close()
+        if report and source:
+            payload = build_task_response(
+                report,
+                company,
+                from_cache=True,
+                cache_source=source,
+            )
+            safe_features = []
+            for i, f in enumerate(payload.get("features", [])):
+                if isinstance(f, dict):
+                    try:
+                        safe_features.append(_safe_feature(f, i).model_dump())
+                    except Exception:
+                        pass
+
+            async def cached_event_generator():
+                yield f"data: {json_lib.dumps({'event': 'complete', 'data': {**payload, 'features': safe_features}})}\n\n"
+
+            return StreamingResponse(
+                cached_event_generator(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Accel-Buffering": "no",
+                },
+            )
+
     from cache.redis_client import check_rate_limit
 
     if not check_rate_limit(
@@ -460,7 +597,7 @@ async def run_agent_stream(request: AgentRequest):
         try:
             graph = app.state.graph
             result = graph.invoke({
-                "company_name": request.company_name,
+                "company_name": company,
                 "date_window_days": request.date_window_days,
                 "_progress_callback": progress_callback,
             })
@@ -474,7 +611,10 @@ async def run_agent_stream(request: AgentRequest):
                 return
 
             from observability.pipeline_metrics import record_pipeline_completion
-            record_pipeline_completion(request.company_name, report, failed=False)
+            record_pipeline_completion(company, report, failed=False)
+
+            from cache.report_cache import set_report_in_redis
+            set_report_in_redis(company, request.date_window_days, report)
             features = report.get("features", [])
 
             # Build safe response
@@ -492,7 +632,7 @@ async def run_agent_stream(request: AgentRequest):
             # Persist to DB
             try:
                 db = SessionLocal()
-                crud.save_report(db, request.company_name, report)
+                crud.save_report(db, company, report)
                 db.close()
             except Exception as db_exc:
                 logger.warning("SSE — DB persistence failed (non-fatal): %s", db_exc)
@@ -501,7 +641,7 @@ async def run_agent_stream(request: AgentRequest):
             progress_queue.put({
                 "event": "complete",
                 "data": {
-                    "company_name": report.get("company_name", request.company_name),
+                    "company_name": report.get("company_name", company),
                     "generated_at": report.get("generated_at", datetime.now(timezone.utc).isoformat()),
                     "executive_summary": report.get("executive_summary", "No summary available."),
                     "features": safe_features,
@@ -515,7 +655,7 @@ async def run_agent_stream(request: AgentRequest):
         except Exception as exc:
             try:
                 from observability.pipeline_metrics import record_pipeline_completion
-                record_pipeline_completion(request.company_name, {}, failed=True)
+                record_pipeline_completion(company, {}, failed=True)
             except Exception:
                 pass
             logger.error("SSE — Pipeline error: %s", exc, exc_info=True)

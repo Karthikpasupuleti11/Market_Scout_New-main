@@ -7,6 +7,7 @@ export async function submitPipeline(companyName, options = {}) {
         body: JSON.stringify({
             company_name: companyName,
             date_window_days: options.dateWindowDays || 7,
+            force_refresh: options.forceRefresh || false,
         }),
         signal: options.signal,
     });
@@ -44,6 +45,7 @@ export async function runPipelineSSE(companyName, options = {}) {
         body: JSON.stringify({
             company_name: companyName,
             date_window_days: options.dateWindowDays || 7,
+            force_refresh: options.forceRefresh || false,
         }),
         signal: options.signal,
     });

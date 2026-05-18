@@ -5,7 +5,11 @@ Enterprise data access layer for PostgreSQL.
 Handles: Competitor lookups, Feature saves, and Report persistence.
 """
 
-from sqlalchemy.orm import Session
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
+from sqlalchemy.orm import Session, joinedload
+
 from .models import Competitor, Feature, Report
 from .scheduled_job_model import ScheduledJob
 
@@ -158,6 +162,113 @@ def save_report(db: Session, company_name: str, report_data: dict) -> Report:
     return report
 
 
+def delete_cached_reports_for_company(
+    db: Session,
+    company_name: str,
+    date_window_days: int,
+    max_age_seconds: int,
+) -> int:
+    """Delete report rows used by the cache fast-path (within max_age, matching window)."""
+    competitor = db.query(Competitor).filter(
+        Competitor.name.ilike(company_name.strip())
+    ).first()
+    if not competitor:
+        return 0
+
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=max_age_seconds)
+    candidates = (
+        db.query(Report)
+        .filter(
+            Report.competitor_id == competitor.id,
+            Report.created_at >= cutoff,
+        )
+        .all()
+    )
+
+    target_days = int(date_window_days)
+    deleted = 0
+    for report in candidates:
+        meta = report.metadata_ or {}
+        stored_days = meta.get("date_window_days")
+        if stored_days is None or int(stored_days) == target_days:
+            db.delete(report)
+            deleted += 1
+
+    if deleted:
+        db.commit()
+    return deleted
+
+
+def get_latest_report_matching_window(
+    db: Session,
+    company_name: str,
+    date_window_days: int,
+    max_age_seconds: int,
+) -> Optional[Report]:
+    """Latest report for a company matching the recency window, within max_age."""
+    competitor = db.query(Competitor).filter(
+        Competitor.name.ilike(company_name.strip())
+    ).first()
+    if not competitor:
+        return None
+
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=max_age_seconds)
+    candidates = (
+        db.query(Report)
+        .options(joinedload(Report.features))
+        .filter(
+            Report.competitor_id == competitor.id,
+            Report.created_at >= cutoff,
+        )
+        .order_by(Report.created_at.desc())
+        .limit(20)
+        .all()
+    )
+
+    target_days = int(date_window_days)
+    for report in candidates:
+        meta = report.metadata_ or {}
+        stored_days = meta.get("date_window_days")
+        if stored_days is None or int(stored_days) == target_days:
+            return report
+    return None
+
+
+def report_to_synthesis_dict(report: Report, company_name: str) -> dict:
+    """Reconstruct pipeline synthesis_report JSON from a persisted Report."""
+    features = []
+    for i, f in enumerate(report.features or []):
+        features.append({
+            "rank": i + 1,
+            "title": f.feature_title or f.feature_text or "",
+            "description": f.description or f.feature_text or "",
+            "category": f.category,
+            "confidence_score": f.confidence_score,
+            "impact_assessment": f.impact_assessment,
+            "source_url": f.source_url,
+            "source_count": f.source_count,
+            "key_metrics": f.metrics if isinstance(f.metrics, list) else [],
+        })
+
+    meta = dict(report.metadata_ or {})
+    generated_at = (
+        report.created_at.isoformat()
+        if report.created_at
+        else datetime.now(timezone.utc).isoformat()
+    )
+
+    return {
+        "company_name": company_name,
+        "generated_at": generated_at,
+        "executive_summary": report.executive_summary or "",
+        "features": features,
+        "total_sources_analysed": report.total_sources or 0,
+        "total_features_verified": report.total_features or len(features),
+        "all_sources": report.all_sources or [],
+        "metadata": meta,
+    }
+
+
 def get_reports_for_competitor(db: Session, company_name: str, limit: int = 10) -> list:
     """Get the most recent reports for a company."""
     competitor = db.query(Competitor).filter(
@@ -228,4 +339,4 @@ def get_latest_report(db: Session) -> dict | None:
         "total_features": report.total_features,
         "total_sources": report.total_sources,
         "executive_summary": report.executive_summary,
-    }
+    }
