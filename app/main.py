@@ -22,8 +22,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
-from prometheus_client import make_asgi_app
-
 load_dotenv()
 
 # ── Internal Imports ───────────────────────────────────────────────
@@ -36,13 +34,9 @@ from scheduler import scheduler
 from observability.metrics import (
     REQUEST_COUNT,
     REQUEST_LATENCY,
-    PIPELINE_RUNS,
     ACTIVE_PIPELINES,
-    FEATURES_EXTRACTED,
-    FEATURES_VERIFIED,
-    CONFIDENCE_SCORE,
-    SOURCES_ANALYSED,
 )
+from observability.prometheus_setup import create_metrics_asgi_app
 
 # ────────────────────────────────────────────────────────────────────
 # Logging Configuration
@@ -135,6 +129,9 @@ async def lifespan(app: FastAPI):
     app.state.graph = build_graph()
     logger.info("LangGraph pipeline compiled and ready")
 
+    from observability.resource_metrics import start_resource_metrics_collector
+    start_resource_metrics_collector()
+
     # Start the APScheduler (only one process should own it)
     if settings.ENABLE_SCHEDULER:
         scheduler.init_scheduler()
@@ -221,8 +218,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Mount Prometheus /metrics endpoint ─────────────────────────────
-metrics_app = make_asgi_app()
+# ── Mount Prometheus /metrics endpoint (aggregates all worker processes) ──
+metrics_app = create_metrics_asgi_app()
 app.mount("/metrics", metrics_app)
 
 
@@ -366,8 +363,20 @@ class TaskStatusResponse(BaseModel):
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
 
-# Track task_ids that have already had metrics recorded to prevent double-counting
+# Fallback when Redis is unavailable (per-process only)
 _metrics_recorded_tasks: set = set()
+
+
+def _try_record_task_metrics(task_id: str) -> bool:
+    """Return True if this task's terminal metrics have not been recorded yet."""
+    try:
+        from cache.redis_client import get_redis
+        return bool(get_redis().set(f"metrics:recorded:{task_id}", "1", nx=True, ex=7200))
+    except Exception:
+        if task_id in _metrics_recorded_tasks:
+            return False
+        _metrics_recorded_tasks.add(task_id)
+        return True
 
 @app.get(
     "/task/{task_id}",
@@ -390,49 +399,14 @@ async def get_task_status(task_id: str):
     elif result.status == "SUCCESS":
         response["result"] = result.result
 
-        # ── Record metrics in FastAPI's registry (only once per task) ──
-        if task_id not in _metrics_recorded_tasks:
-            _metrics_recorded_tasks.add(task_id)
-            ACTIVE_PIPELINES.dec()  # Pipeline finished — decrement gauge
-            try:
-                report = result.result or {}
-                features = report.get("features", [])
-                error_msg = report.get("metadata", {}).get("error") if isinstance(report.get("metadata"), dict) else None
-                company = report.get("company_name", "unknown")
-
-                if error_msg and not features:
-                    PIPELINE_RUNS.labels(status="error").inc()
-                else:
-                    PIPELINE_RUNS.labels(status="completed").inc()
-
-                for f in features:
-                    if isinstance(f, dict):
-                        cat = f.get("category", "unknown")
-                        FEATURES_EXTRACTED.labels(company=company, category=cat).inc()
-                        score = f.get("confidence_score", 0) or 0
-                        CONFIDENCE_SCORE.observe(score)
-
-                verified_count = report.get("total_features_verified", 0) or len(features)
-                FEATURES_VERIFIED.labels(company=company).inc(verified_count)
-                SOURCES_ANALYSED.observe(report.get("total_sources_analysed", 0))
-
-                logger.info("METRICS — Recorded: company=%s, features=%d, verified=%d, sources=%d",
-                    company, len(features), verified_count, report.get("total_sources_analysed", 0))
-            except Exception as exc:
-                logger.debug("Metric recording failed (non-fatal): %s", exc)
-
-            # Prevent the set from growing forever
-            if len(_metrics_recorded_tasks) > 500:
-                _metrics_recorded_tasks.clear()
+        if _try_record_task_metrics(task_id):
+            ACTIVE_PIPELINES.dec()
 
     elif result.status == "FAILURE":
         response["error"] = str(result.result) if result.result else "Task failed"
 
-        # Record failure metric (only once per task)
-        if task_id not in _metrics_recorded_tasks:
-            _metrics_recorded_tasks.add(task_id)
-            ACTIVE_PIPELINES.dec()  # Pipeline finished — decrement gauge
-            PIPELINE_RUNS.labels(status="error").inc()
+        if _try_record_task_metrics(task_id):
+            ACTIVE_PIPELINES.dec()
 
     elif result.status == "RETRY":
         response["progress"] = {"message": "Task is being retried"}
@@ -499,24 +473,9 @@ async def run_agent_stream(request: AgentRequest):
                 })
                 return
 
-            # Record metrics
-            error_msg = result.get("error") or report.get("metadata", {}).get("error")
+            from observability.pipeline_metrics import record_pipeline_completion
+            record_pipeline_completion(request.company_name, report, failed=False)
             features = report.get("features", [])
-            if error_msg and not features:
-                PIPELINE_RUNS.labels(status="error").inc()
-            else:
-                PIPELINE_RUNS.labels(status="completed").inc()
-
-            for f in features:
-                cat = f.get("category", "unknown") if isinstance(f, dict) else "unknown"
-                FEATURES_EXTRACTED.labels(company=request.company_name, category=cat).inc()
-                score = f.get("confidence_score", 0) if isinstance(f, dict) else 0
-                CONFIDENCE_SCORE.observe(score)
-
-            FEATURES_VERIFIED.labels(company=request.company_name).inc(
-                report.get("total_features_verified", 0)
-            )
-            SOURCES_ANALYSED.observe(report.get("total_sources_analysed", 0))
 
             # Build safe response
             safe_features = []
@@ -554,7 +513,11 @@ async def run_agent_stream(request: AgentRequest):
             })
 
         except Exception as exc:
-            PIPELINE_RUNS.labels(status="error").inc()
+            try:
+                from observability.pipeline_metrics import record_pipeline_completion
+                record_pipeline_completion(request.company_name, {}, failed=True)
+            except Exception:
+                pass
             logger.error("SSE — Pipeline error: %s", exc, exc_info=True)
             progress_queue.put({
                 "event": "error",

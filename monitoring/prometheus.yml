@@ -4,9 +4,9 @@ global:
 
 scrape_configs:
   - job_name: "market-scout"
-    metrics_path: "/metrics"
+    metrics_path: "/metrics/"
     static_configs:
-      - targets: ["host.docker.internal:8000"]
+      - targets: ["app:8000"]
         labels:
           service: "market-intelligence-scout"
           environment: "development"

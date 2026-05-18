@@ -5,6 +5,9 @@ services:
   app:
     build: .
     container_name: market_scout_app
+    command: >
+      sh -c "mkdir -p /tmp/prometheus_multiproc &&
+      exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
     ports:
       - "8000:8000"
     env_file: .env
@@ -15,6 +18,9 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
       - ENABLE_SCHEDULER=False
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
+    volumes:
+      - prometheus_multiproc:/tmp/prometheus_multiproc
     depends_on:
       postgres:
         condition: service_healthy
@@ -44,6 +50,9 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
       - ENABLE_SCHEDULER=False
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
+    volumes:
+      - prometheus_multiproc:/tmp/prometheus_multiproc
     depends_on:
       postgres:
         condition: service_healthy
@@ -150,8 +159,9 @@ volumes:
   postgres_data:
   redis_data:
   prometheus_data:
+  prometheus_multiproc:
   grafana_data:
 
 networks:
   scout_net:
-    driver: bridge
+    driver: bridge

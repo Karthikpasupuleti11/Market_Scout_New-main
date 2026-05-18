@@ -78,17 +78,6 @@ def run_pipeline_task(self, company_name: str, date_window_days: int = 7):
         from graph.builder import build_graph
         from database.session import SessionLocal
         from database import crud
-        from observability.metrics import (
-            PIPELINE_RUNS,
-            ACTIVE_PIPELINES,
-            FEATURES_EXTRACTED,
-            FEATURES_VERIFIED,
-            CONFIDENCE_SCORE,
-            SOURCES_ANALYSED,
-        )
-
-        ACTIVE_PIPELINES.inc()
-
         # ── Build graph (stateless, safe per-task) ────────────────
         graph = build_graph()
 
@@ -108,25 +97,10 @@ def run_pipeline_task(self, company_name: str, date_window_days: int = 7):
         if not report:
             raise RuntimeError("Pipeline produced no report.")
 
-        # ── Record Prometheus metrics ─────────────────────────────
-        error_msg = result.get("error") or report.get("metadata", {}).get("error")
         features = report.get("features", [])
 
-        if error_msg and not features:
-            PIPELINE_RUNS.labels(status="error").inc()
-        else:
-            PIPELINE_RUNS.labels(status="completed").inc()
-
-        for f in features:
-            cat = f.get("category", "unknown") if isinstance(f, dict) else "unknown"
-            FEATURES_EXTRACTED.labels(company=company_name, category=cat).inc()
-            score = f.get("confidence_score", 0) if isinstance(f, dict) else 0
-            CONFIDENCE_SCORE.observe(score)
-
-        FEATURES_VERIFIED.labels(company=company_name).inc(
-            report.get("total_features_verified", 0)
-        )
-        SOURCES_ANALYSED.observe(report.get("total_sources_analysed", 0))
+        from observability.pipeline_metrics import record_pipeline_completion
+        record_pipeline_completion(company_name, report, failed=False)
 
         # ── Persist to PostgreSQL ─────────────────────────────────
         db = None
@@ -185,8 +159,8 @@ def run_pipeline_task(self, company_name: str, date_window_days: int = 7):
         logger.error("CELERY TASK %s — Failed after %.1fs: %s", task_id, elapsed_total, exc, exc_info=True)
 
         try:
-            from observability.metrics import PIPELINE_RUNS
-            PIPELINE_RUNS.labels(status="error").inc()
+            from observability.pipeline_metrics import record_pipeline_completion
+            record_pipeline_completion(company_name, {}, failed=True)
         except Exception:
             pass
 
@@ -200,9 +174,3 @@ def run_pipeline_task(self, company_name: str, date_window_days: int = 7):
         # Non-retryable — raise so Celery marks as FAILURE
         raise
 
-    finally:
-        try:
-            from observability.metrics import ACTIVE_PIPELINES
-            ACTIVE_PIPELINES.dec()
-        except Exception:
-            pass

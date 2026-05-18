@@ -150,4 +150,5 @@ URLS_DISCARDED = Counter(
 ACTIVE_PIPELINES = Gauge(
     "active_pipelines",
     "Number of pipeline runs currently in progress",
+    multiprocess_mode="livesum",
 )
