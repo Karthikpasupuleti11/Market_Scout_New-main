@@ -20,6 +20,7 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
       - ENABLE_SCHEDULER=False
       - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
+      - LLM_GLOBAL_PIPELINE_LIMIT=10
     volumes:
       - prometheus_multiproc:/tmp/prometheus_multiproc
     depends_on:
@@ -40,7 +41,7 @@ services:
       find /tmp/prometheus_multiproc -mindepth 1 -type f -delete 2>/dev/null;
       celery -A celery_app worker
       --loglevel=info
-      --concurrency=2
+      --concurrency=4
       --max-tasks-per-child=50
       --without-heartbeat
       -Q celery"
@@ -54,6 +55,7 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
       - ENABLE_SCHEDULER=False
       - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
+      - LLM_GLOBAL_PIPELINE_LIMIT=10
     volumes:
       - prometheus_multiproc:/tmp/prometheus_multiproc
     depends_on:

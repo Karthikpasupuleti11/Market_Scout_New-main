@@ -27,6 +27,20 @@ const PIPELINE_STAGES = [
     'Verification', 'Scoring', 'Synthesis'
 ];
 
+/* ── Capacity / queue-full error detection ──────────────────────── */
+function isCapacityError(msg) {
+    if (!msg) return false;
+    const lower = msg.toLowerCase();
+    return (
+        lower.includes('capacity') ||
+        lower.includes('queue') ||
+        lower.includes('concurrent') ||
+        lower.includes('429') ||
+        lower.includes('two minutes') ||
+        lower.includes('wait about')
+    );
+}
+
 /* ── Insight tag logic ─────────────────────────────────────────── */
 function getCategoryTag(category) {
     if (!category) return 'capability';
@@ -293,11 +307,16 @@ export default function RunPipeline() {
 
             {/* ── Error ──────────────────────────────────────── */}
             {error && (
-                <div className="card error-section fade-in">
+                <div className={`card error-section fade-in ${isCapacityError(error) ? 'error-section--queue' : ''}`}>
                     <HiOutlineExclamationCircle className="error-icon" />
                     <div>
-                        <h3>Analysis Failed</h3>
+                        <h3>{isCapacityError(error) ? 'Pipeline Queue Full' : 'Analysis Failed'}</h3>
                         <p>{error}</p>
+                        {isCapacityError(error) && (
+                            <p className="error-retry-hint">
+                                💡 Tip: existing pipelines finish in ~2–3 minutes. You can also re-run the same company to load a cached result instantly.
+                            </p>
+                        )}
                     </div>
                 </div>
             )}

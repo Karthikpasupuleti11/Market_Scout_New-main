@@ -326,6 +326,24 @@
     color: var(--text-muted);
 }
 
+.error-section--queue {
+    border-color: rgba(245, 158, 11, 0.4);
+    background: rgba(245, 158, 11, 0.05);
+}
+
+.error-section--queue .error-icon,
+.error-section--queue h3 {
+    color: var(--warning);
+}
+
+.error-retry-hint {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(245, 158, 11, 0.2);
+    font-style: italic;
+    color: var(--text-secondary);
+}
+
 
 /* ═══════════════════════════════════════════════════════════════════
    RESULTS
