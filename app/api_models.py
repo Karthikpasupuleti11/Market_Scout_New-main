@@ -21,6 +21,12 @@ class AgentRequest(BaseModel):
         description="Recency window (in days) used for date validation + scoring + synthesis",
         examples=[7, 14, 30],
     )
+    session_id: str = Field(
+        ...,
+        min_length=8,
+        max_length=128,
+        description="Client-generated session id used to isolate RAG indexes per device/browser",
+    )
 
 
 class FeatureItem(BaseModel):

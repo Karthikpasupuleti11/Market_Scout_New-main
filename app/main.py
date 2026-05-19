@@ -218,7 +218,8 @@ async def run_agent(request: AgentRequest):
 
     task = run_market_pipeline.delay(
         request.company_name,
-        request.date_window_days
+        request.date_window_days,
+        request.session_id,
     )
 
     return {

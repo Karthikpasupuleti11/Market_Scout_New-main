@@ -17,7 +17,7 @@ import asyncio
 graph = build_graph()
 
 @celery.task(bind=True)
-def run_market_pipeline(self, company_name, date_window_days):
+def run_market_pipeline(self, company_name, date_window_days, session_id):
 
     result = asyncio.run (
         graph.ainvoke({
@@ -75,7 +75,7 @@ def run_market_pipeline(self, company_name, date_window_days):
     # ── Build conversational RAG index ─────────────────
 
     try:
-        asyncio.run(process_report(response))
+        asyncio.run(process_report(response, session_id))
     except Exception as e:
         print("RAG processing failed:", e)
 
