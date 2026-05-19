@@ -42,7 +42,7 @@ async def process_pdf(file, session_id: str):
     redis.set(_redis_key(session_id), store.serialize(), ex=3600)  # ⏳ 1 hour expiry
 
 
-def process_report_text(company_name, executive_summary, features, all_sources):
+def process_report_text(company_name, executive_summary, features, all_sources, session_id=None):
     """Convert structured report data into plain-text chunks, embed, and store
     in the vector store so the user can query the report via RAG."""
 
@@ -83,59 +83,9 @@ def process_report_text(company_name, executive_summary, features, all_sources):
 
     full_text = "\n\n".join(sections)
 
-    # ── Chunk, embed, and store ──────────────────────────────────────
-    raw_chunks = chunk_text(full_text)
-    all_chunks = [{"text": c["text"], "page": 1} for c in raw_chunks]
-
-    embeddings = embed([c["text"] for c in all_chunks])
-
-    store = VectorStore()
-    store.build(embeddings, all_chunks)
-
-    redis = get_redis()
-    redis.set(REDIS_KEY, store.serialize(), ex=3600)  # ⏳ 1 hour expiry
-
-
-def process_report_text(company_name, executive_summary, features, all_sources):
-    """Convert structured report data into plain-text chunks, embed, and store
-    in the vector store so the user can query the report via RAG."""
-
-    # ── Build a rich text document from the report data ──────────────
-    sections = []
-
-    # Executive summary
-    if executive_summary:
-        sections.append(
-            f"Executive Summary for {company_name}:\n{executive_summary}"
-        )
-
-    # Each feature as a standalone paragraph
-    for i, feat in enumerate(features or [], 1):
-        title = feat.get("title") or feat.get("feature_title") or f"Signal {i}"
-        desc = feat.get("description") or feat.get("feature_summary") or ""
-        category = feat.get("category") or "General"
-        confidence = feat.get("confidence_score") or feat.get("confidence") or 0
-        impact = feat.get("impact_assessment") or ""
-        metrics = feat.get("key_metrics") or []
-        source_url = feat.get("source_url") or ""
-
-        parts = [f"Signal #{i} — {title} (Category: {category}, Confidence: {confidence:.0%})"]
-        if desc:
-            parts.append(f"Description: {desc}")
-        if impact:
-            parts.append(f"Impact: {impact}")
-        if metrics:
-            parts.append(f"Key Metrics: {', '.join(str(m) for m in metrics)}")
-        if source_url:
-            parts.append(f"Source: {source_url}")
-        sections.append("\n".join(parts))
-
-    # Sources section
-    if all_sources:
-        sources_text = "\n".join(f"  - {url}" for url in all_sources)
-        sections.append(f"All Sources Analyzed:\n{sources_text}")
-
-    full_text = "\n\n".join(sections)
+    if not full_text.strip():
+        logger.warning("RAG — Empty report text, skipping indexing")
+        return
 
     # ── Chunk, embed, and store ──────────────────────────────────────
     raw_chunks = chunk_text(full_text)
@@ -146,8 +96,12 @@ def process_report_text(company_name, executive_summary, features, all_sources):
     store = VectorStore()
     store.build(embeddings, all_chunks)
 
+    # Use company name as fallback key if no session_id provided
+    key = _redis_key(session_id) if session_id else f"{REDIS_KEY_PREFIX}:{company_name.lower().replace(' ', '_')}"
+
     redis = get_redis()
-    redis.set(REDIS_KEY, store.serialize(), ex=3600)  # ⏳ 1 hour expiry
+    redis.set(key, store.serialize(), ex=3600)  # ⏳ 1 hour expiry
+    logger.info("RAG — Report indexed for '%s' (key=%s, chunks=%d)", company_name, key, len(all_chunks))
 
 
 def load_store(session_id: str):
@@ -161,6 +115,7 @@ def load_store(session_id: str):
     store.deserialize(data)
     return store
 
+
 async def process_report(report: dict, session_id: str):
 
     print("PROCESS REPORT STARTED")
@@ -168,7 +123,6 @@ async def process_report(report: dict, session_id: str):
     sections = []
 
     # ── Executive Summary ─────────────────────────
-
     sections.append(
         f"""
 Company:
@@ -180,7 +134,6 @@ Executive Summary:
     )
 
     # ── Features ─────────────────────────────────
-
     for feature in report.get("features", []):
 
         metrics = feature.get("key_metrics") or []
@@ -257,16 +210,17 @@ Metrics:
 
     print("RAG INDEX STORED SUCCESSFULLY")
 
+
 async def ask_question(query: str, session_id: str):
     store = load_store(session_id)
     if not store:
         return {"answer": "No document uploaded.", "sources": []}
 
     # Detect broad/summary questions
-    broad_keywords = ["about", "summarize", "summary", "overview", "what is", 
+    broad_keywords = ["about", "summarize", "summary", "overview", "what is",
                       "company", "topic", "describe", "explain"]
     is_broad = any(kw in query.lower() for kw in broad_keywords)
-    
+
     k = 8 if is_broad else 4  # Fetch more chunks for broad questions
 
     query_embedding = embed([query])
@@ -274,38 +228,50 @@ async def ask_question(query: str, session_id: str):
     context = "\n\n".join([c["text"] for c in chunks])
 
     messages = [
-    {
-        "role": "system",
-        "content": """You are a smart Report Assistant for a competitive intelligence platform called Market Scout.
+        {
+            "role": "system",
+            "content": """You are a smart Report Assistant for a competitive intelligence platform called Market Scout.
 You have access to excerpts from an intelligence report about a company.
 
 RULES:
 1. If the user's question relates to the report content, answer using the provided context. Cite specific signals, metrics, or findings from the report.
-2. If the user asks a general question (e.g. "what is RAG?", "how are you?", "explain transformers"), answer using your general knowledge — but keep it concise and helpful.
-3. If the user asks something that COULD be in the report but isn't, say something like: "The report doesn't cover this specific topic, but here's what I know generally: ..."
-4. Be conversational and natural. Don't be robotic.
-5. When answering from the report, mention it naturally (e.g. "According to the report..." or "The analysis found that...").
-6. Keep answers concise — 2-4 sentences for simple questions, more for detailed analysis questions."""
-    },
-    {
-        "role": "user",
-        "content": f"""Here are excerpts from the intelligence report for context:
+2. If the user asks a general question (e.g. "what is RAG?", "how are you?"), answer using your general knowledge — keep it concise.
+3. If the user asks something that COULD be in the report but isn't, say: "The report doesn't cover this, but here's what I know..."
+4. Be conversational but organized. Sound like a knowledgeable analyst briefing a colleague.
+5. When answering from the report, reference it naturally (e.g. "According to the report..." or "The analysis found...").
+
+FORMATTING RULES (CRITICAL — follow these exactly):
+- Use numbered lists (1, 2, 3...) when listing multiple signals, features, or findings.
+- Use arrows (→) to show cause-effect or key takeaways.
+- Use line breaks between sections for readability.
+- For key metrics or confidence scores, include them inline like: (Confidence: 95%)
+- Do NOT use markdown. No ** for bold, no # for headers, no ``` for code blocks, no * for bullets.
+- Keep it clean and structured — like a professional briefing, not a chatbot wall of text.
+
+EXAMPLE FORMAT:
+The report identifies 3 key signals for Google:
+
+1. Offline Conversion Import → Enables developers to import offline conversions via the Ads API (Confidence: 95%)
+2. Experiment Functionality v24.1 → Provides arm-level stats for more informed decisions
+3. Quick Share Cross-Platform → QR-code based transfer between Android and iOS
+
+Key takeaway → All signals show high confidence (95%), indicating strong verification across sources."""
+        },
+        {
+            "role": "user",
+            "content": f"""Here are excerpts from the intelligence report for context:
 ---
 {context}
 ---
 
 User question: {query}"""
-    }
-]
+        }
+    ]
 
     try:
-        response = invoke_llm(messages)
+        response = await invoke_llm(messages)
     except Exception as exc:
         logger.warning("RAG — LLM call failed: %s", exc)
-        response = await invoke_llm(messages)
-    except Exception as e:
-        print("LLM ERROR:", e)
-
         return {
             "answer": "Unable to generate answer right now. Please try again.",
             "sources": chunks,

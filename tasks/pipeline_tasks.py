@@ -77,6 +77,7 @@ def _run_pipeline_body(task_ref, company_name: str, date_window_days: int, task_
     )
 
     try:
+        import asyncio
         from graph.builder import build_graph
         from database.session import SessionLocal
         from database import crud
@@ -86,11 +87,11 @@ def _run_pipeline_body(task_ref, company_name: str, date_window_days: int, task_
         def progress_callback(node_name: str, status: str, elapsed: float = 0):
             _update_progress(self, node_name, status, elapsed)
 
-        result = graph.invoke({
+        result = asyncio.run(graph.ainvoke({
             "company_name": company_name,
             "date_window_days": date_window_days,
             "_progress_callback": progress_callback,
-        })
+        }))
 
         report = result.get("synthesis_report", {})
 

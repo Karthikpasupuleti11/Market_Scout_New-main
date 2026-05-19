@@ -1,6 +1,6 @@
 # app/rag/routes.py
 
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File, Header
 from pydantic import BaseModel
 from typing import List, Optional
 from app.rag.service import process_pdf, process_report_text, ask_question
@@ -26,7 +26,10 @@ async def upload_pdf(
 
 
 @router.post("/index-report")
-def index_report(req: IndexReportRequest):
+async def index_report(
+    req: IndexReportRequest,
+    x_session_id: str = Header(..., alias="X-Session-Id"),
+):
     """Convert a report's structured data into text, chunk it, embed it,
     and store in the vector store — ready for RAG queries."""
     process_report_text(
@@ -34,6 +37,7 @@ def index_report(req: IndexReportRequest):
         executive_summary=req.executive_summary,
         features=req.features,
         all_sources=req.all_sources,
+        session_id=x_session_id,
     )
     return {"message": "Report indexed successfully", "company": req.company_name}
 

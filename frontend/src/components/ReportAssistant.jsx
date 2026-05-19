@@ -76,6 +76,10 @@ export default function ReportAssistant({ report, companyName, autoOpen }) {
             if (!indexed && !indexing) {
                 handleIndex();
             }
+            // Scroll to show the full assistant panel
+            setTimeout(() => {
+                window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            }, 250);
         }
         prevAutoOpen.current = !!autoOpen;
     }, [autoOpen]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -84,13 +88,27 @@ export default function ReportAssistant({ report, companyName, autoOpen }) {
         setOpen(prev => {
             const willOpen = !prev;
             if (willOpen) {
-                // Scroll into view after React renders the panel
+                // Two-phase scroll: after the panel body renders, scroll
+                // to the bottom of the page so the chat input is fully visible
                 setTimeout(() => {
-                    panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }, 100);
+                    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                }, 200);
             }
             return willOpen;
         });
+    };
+
+    // Strip markdown formatting but preserve structured text (numbers, arrows, line breaks)
+    const cleanMarkdown = (text) => {
+        if (!text) return text;
+        return text
+            .replace(/\*\*(.*?)\*\*/g, '$1')       // **bold** → bold
+            .replace(/(?<!\w)\*(?!\s)(.*?)(?<!\s)\*(?!\w)/g, '$1') // *italic* → italic (careful not to strip *)
+            .replace(/^#{1,6}\s+/gm, '')            // ### headers → plain text
+            .replace(/`([^`]+)`/g, '$1')             // `code` → plain
+            .replace(/```[\s\S]*?```/g, '')          // code blocks → remove
+            .replace(/\n{3,}/g, '\n\n')             // collapse excess newlines
+            .trim();
     };
 
     const handleAsk = async () => {
@@ -103,7 +121,7 @@ export default function ReportAssistant({ report, companyName, autoOpen }) {
             const res = await askRagQuestion(userMsg.text);
             setMessages(prev => [
                 ...prev,
-                { type: 'bot', text: res.answer, sources: res.sources || [] },
+                { type: 'bot', text: cleanMarkdown(res.answer), sources: res.sources || [] },
             ]);
         } catch (err) {
             setMessages(prev => [

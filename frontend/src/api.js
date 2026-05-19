@@ -139,6 +139,7 @@ export async function uploadRagPDF(file) {
 
     const res = await fetch(`${API_BASE}/rag/upload`, {
         method: 'POST',
+        headers: { 'X-Session-Id': getSessionId() },
         body: formData,
     });
 
@@ -154,7 +155,10 @@ export async function uploadRagPDF(file) {
 export async function indexReportForRag(reportData) {
     const res = await fetch(`${API_BASE}/rag/index-report`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Session-Id': getSessionId(),
+        },
         body: JSON.stringify(reportData),
     });
 

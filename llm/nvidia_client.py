@@ -14,8 +14,8 @@ Features:
 import logging
 import threading
 import time
-import threading
 import asyncio
+from collections import deque
 from weakref import WeakKeyDictionary
 
 from itertools import cycle
@@ -30,7 +30,6 @@ from observability.metrics import (
     LLM_TOKEN_USAGE,
 )
 from cache.redis_client import make_cache_key, get_cache, set_cache
-from observability.metrics import LLM_CALL_COUNT, LLM_LATENCY, LLM_TOKEN_USAGE
 
 logger = logging.getLogger(__name__)
 
@@ -208,6 +207,29 @@ def _infer_agent_name(
         return "synthesis"
 
     return "unknown"
+
+
+# ─────────────────────────────────────────────────────────────
+# PROMPT CACHE KEY
+# ─────────────────────────────────────────────────────────────
+
+def _prompt_cache_key(
+    messages: List[Dict[str, str]],
+    temperature: float,
+    max_tokens: int,
+) -> str:
+    """Build a deterministic Redis cache key for a given prompt.
+
+    Uses SHA-256 of the serialised messages + params so identical
+    deterministic calls (temperature=0) are served from cache.
+    """
+    import hashlib, json as _json
+    payload = _json.dumps(
+        {"messages": messages, "temperature": temperature, "max_tokens": max_tokens},
+        sort_keys=True,
+    )
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:24]
+    return f"mscout:llm_cache:{digest}"
 
 
 # ─────────────────────────────────────────────────────────────

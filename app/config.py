@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     # ── Application ────────────────────────────────────────────────
     APP_NAME: str = "Market Intelligence Scout"
     DEBUG: bool = os.getenv("DEBUG", "False") == "True"
+    ENABLE_SCHEDULER: bool = os.getenv("ENABLE_SCHEDULER", "True") == "True"
 
     # ── NVIDIA LLM ─────────────────────────────────────────────────
     # NVIDIA_API_KEY: str = os.getenv("NVIDIA_API_KEY", "")
@@ -91,6 +92,14 @@ class Settings(BaseSettings):
     # ── Pipeline ───────────────────────────────────────────────────
     DATE_WINDOW_DAYS: int = 7           # Only features ≤ 7 days old
     MAX_RETRIES: int = 3                # Retry count for transient failures
+    LLM_GLOBAL_PIPELINE_LIMIT: int = int(os.getenv("LLM_GLOBAL_PIPELINE_LIMIT", "10"))  # Max concurrent pipelines
+
+    # ── LLM Batching ───────────────────────────────────────────────
+    LLM_BATCH_AUTHORITY: int = int(os.getenv("LLM_BATCH_AUTHORITY", "5"))           # Articles per authority batch
+    LLM_BATCH_FEATURE_EXTRACTION: int = int(os.getenv("LLM_BATCH_FEATURE_EXTRACTION", "3"))  # Articles per feature batch
+
+    # ── Playwright ─────────────────────────────────────────────────
+    PLAYWRIGHT_MAX_CONCURRENT: int = int(os.getenv("PLAYWRIGHT_MAX_CONCURRENT", "3"))  # Max concurrent browsers
 
     # ── Gmail API Configuration ────────────────────────────────────
 

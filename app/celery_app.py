@@ -62,5 +62,22 @@ celery.conf.update(
 
 @worker_process_init.connect
 def _start_metrics_server(**_):
-    """Expose Prometheus metrics from each worker child process."""
-    start_http_server(9100)
+    """Expose Prometheus metrics from each worker child process.
+
+    Each child uses a unique port derived from its PID to avoid
+    OSError 98 (Address already in use) when multiple workers start.
+    """
+    import os
+    pid = os.getpid()
+    port = 9100 + (pid % 100)
+    try:
+        start_http_server(port)
+        import logging
+        logging.getLogger(__name__).info(
+            "CELERY — Prometheus metrics server started on :%d (pid=%d)", port, pid
+        )
+    except OSError:
+        import logging
+        logging.getLogger(__name__).debug(
+            "CELERY — Metrics port %d already in use (pid=%d), skipping", port, pid
+        )

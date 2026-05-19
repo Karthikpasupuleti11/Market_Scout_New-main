@@ -83,6 +83,15 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("Tracing setup skipped: %s", exc)
 
+    # Pre-warm the RAG embedding model so first index is instant
+    try:
+        from app.rag.embedding import preload as preload_embeddings
+
+        preload_embeddings()
+        logger.info("RAG embedding model pre-loaded")
+    except Exception as exc:
+        logger.warning("RAG embedding preload skipped (non-fatal): %s", exc)
+
     yield
 
     logger.info("Shutting down %s", settings.APP_NAME)

@@ -69,12 +69,12 @@ async def feature_extraction_node(state: GraphState) -> Dict[str, Any]:
 
     for batch in chunk_list(pending, batch_size):
         if len(batch) == 1:
-            all_features.extend(_extract_one(batch[0], company_name) or [])
+            all_features.extend(await _extract_one(batch[0], company_name) or [])
             continue
-        merged = _extract_batch(batch, company_name)
+        merged = await _extract_batch(batch, company_name)
         if merged is None:
             for art in batch:
-                all_features.extend(_extract_one(art, company_name) or [])
+                all_features.extend(await _extract_one(art, company_name) or [])
         else:
             all_features.extend(merged)
 
@@ -85,7 +85,7 @@ async def feature_extraction_node(state: GraphState) -> Dict[str, Any]:
     return {"extracted_features": all_features}
 
 
-def _extract_batch(
+async def _extract_batch(
     articles: List[Dict[str, Any]],
     company_name: str,
 ) -> List[Dict[str, Any]] | None:
@@ -128,7 +128,7 @@ Include exactly one results entry per index from 0 to {len(articles) - 1}, in or
     try:
         from app.config import settings
 
-        response = invoke_llm(
+        response = await invoke_llm(
             [system_message, {"role": "user", "content": user_prompt}],
             temperature=0.0,
             max_tokens=settings.LLM_MAX_TOKENS,
@@ -184,7 +184,9 @@ Include exactly one results entry per index from 0 to {len(articles) - 1}, in or
         return None
 
 
-def _extract_one(article: Dict[str, Any], company_name: str) -> List[Dict[str, Any]]:
+async def _extract_one(article: Dict[str, Any], company_name: str) -> List[Dict[str, Any]]:
+    from app.config import settings
+
     url = article.get("url", "")
 
     cache_key = make_cache_key("features", url)
@@ -238,12 +240,12 @@ CONSTRAINTS:
 
 Return ONLY the JSON list. No preamble, no explanation."""
 
-        try:
-            response = await invoke_llm(
-                [system_message, {"role": "user", "content": user_prompt}],
-                temperature=0.0,
-                max_tokens=settings_max_tokens(),
-            )
+    try:
+        response = await invoke_llm(
+            [system_message, {"role": "user", "content": user_prompt}],
+            temperature=0.0,
+            max_tokens=settings.LLM_MAX_TOKENS,
+        )
 
         cleaned = _clean_json_response(response)
         features = json.loads(cleaned)
@@ -277,9 +279,3 @@ Return ONLY the JSON list. No preamble, no explanation."""
     except Exception as exc:
         logger.warning("FEATURE EXTRACTION — Error for %s: %s", url[:60], exc)
         return []
-
-
-def settings_max_tokens() -> int:
-    from app.config import settings
-
-    return settings.LLM_MAX_TOKENS
