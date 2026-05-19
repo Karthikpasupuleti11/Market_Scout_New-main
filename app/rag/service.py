@@ -6,10 +6,16 @@ from app.rag.vector_store import VectorStore
 from llm.nvidia_client import invoke_llm
 from cache.redis_client import get_redis
 
-REDIS_KEY = "rag_index"
+REDIS_KEY_PREFIX = "rag_index"
 
 
-async def process_pdf(file):
+def _redis_key(session_id: str) -> str:
+    if not session_id:
+        raise ValueError("session_id is required for RAG operations")
+    return f"{REDIS_KEY_PREFIX}:{session_id}"
+
+
+async def process_pdf(file, session_id: str):
     pages = load_pdf(file)
 
     all_chunks = []
@@ -29,12 +35,12 @@ async def process_pdf(file):
     store.build(embeddings, all_chunks)
 
     redis = get_redis()
-    redis.set(REDIS_KEY, store.serialize(), ex=3600)  # ⏳ 1 hour expiry
+    redis.set(_redis_key(session_id), store.serialize(), ex=3600)  # ⏳ 1 hour expiry
 
 
-def load_store():
+def load_store(session_id: str):
     redis = get_redis()
-    data = redis.get(REDIS_KEY)
+    data = redis.get(_redis_key(session_id))
 
     if not data:
         return None
@@ -43,9 +49,104 @@ def load_store():
     store.deserialize(data)
     return store
 
+async def process_report(report: dict, session_id: str):
 
-async def ask_question(query: str):
-    store = load_store()
+    print("PROCESS REPORT STARTED")
+
+    sections = []
+
+    # ── Executive Summary ─────────────────────────
+
+    sections.append(
+        f"""
+Company:
+{report.get('company_name', '')}
+
+Executive Summary:
+{report.get('executive_summary', '')}
+"""
+    )
+
+    # ── Features ─────────────────────────────────
+
+    for feature in report.get("features", []):
+
+        metrics = feature.get("key_metrics") or []
+
+        # Safe handling
+        if not isinstance(metrics, list):
+            metrics = [str(metrics)]
+
+        section = f"""
+Feature Title:
+{feature.get('title', '')}
+
+Description:
+{feature.get('description', '')}
+
+Category:
+{feature.get('category', '')}
+
+Impact:
+{feature.get('impact_assessment', '')}
+
+Metrics:
+{', '.join(metrics)}
+"""
+
+        sections.append(section)
+
+    # ── Final Text ───────────────────────────────
+
+    full_text = "\n\n".join(sections).strip()
+
+    if not full_text:
+        raise Exception("Empty report text")
+
+    # ── Chunking ─────────────────────────────────
+
+    chunks = chunk_text(full_text)
+
+    all_chunks = []
+
+    for c in chunks:
+
+        all_chunks.append({
+            "text": c["text"],
+            "page": "report"
+        })
+
+    print(f"TOTAL CHUNKS: {len(all_chunks)}")
+
+    # ── Embeddings ───────────────────────────────
+
+    embeddings = embed(
+        [c["text"] for c in all_chunks]
+    )
+
+    # ── Vector Store ─────────────────────────────
+
+    store = VectorStore()
+
+    store.build(
+        embeddings,
+        all_chunks
+    )
+
+    # ── Redis Save ───────────────────────────────
+
+    redis = get_redis()
+
+    redis.set(
+        _redis_key(session_id),
+        store.serialize(),
+        ex=3600
+    )
+
+    print("RAG INDEX STORED SUCCESSFULLY")
+
+async def ask_question(query: str, session_id: str):
+    store = load_store(session_id)
     if not store:
         return {"answer": "No document uploaded.", "sources": []}
 

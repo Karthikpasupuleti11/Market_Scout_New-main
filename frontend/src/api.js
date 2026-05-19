@@ -1,5 +1,17 @@
 const API_BASE = 'http://127.0.0.1:8000';
 
+function getSessionId() {
+    let sid = localStorage.getItem('rag_session_id');
+    if (!sid) {
+        sid = (crypto.randomUUID && crypto.randomUUID()) ||
+              `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        localStorage.setItem('rag_session_id', sid);
+    }
+    return sid;
+}
+
+export { getSessionId };
+
 export async function runPipeline(companyName, options = {}) {
     const res = await fetch(`${API_BASE}/run-agent`, {
         method: 'POST',
@@ -7,6 +19,7 @@ export async function runPipeline(companyName, options = {}) {
         body: JSON.stringify({
             company_name: companyName,
             date_window_days: options.dateWindowDays,
+            session_id: getSessionId(),
         }),
         signal: options.signal,
     });
@@ -89,14 +102,12 @@ export async function deleteSchedule(jobId) {
     }
 }
 
-// 🔹 RAG: Upload PDF
-export async function uploadRagPDF(file) {
-    const formData = new FormData();
-    formData.append('file', file);
 
-    const res = await fetch(`${API_BASE}/rag/upload`, {
-        method: 'POST',
-        body: formData,
+
+// 🔹 RAG: Ask Question
+export async function askRagQuestion(query) {
+    const res = await fetch(`${API_BASE}/rag/ask?query=${encodeURIComponent(query)}`, {
+        headers: { 'X-Session-Id': getSessionId() },
     });
 
     if (!res.ok) {
@@ -105,19 +116,6 @@ export async function uploadRagPDF(file) {
     }
 
     return res.json();
-}
-
-
-// 🔹 RAG: Ask Question
-export async function askRagQuestion(query) {
-    const res = await fetch(`${API_BASE}/rag/ask?query=${encodeURIComponent(query)}`);
-
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(err.detail || `Error ${res.status}`);
-    }
-
-    return res.json();  
 }
 
 // 🔹 SYSTEM: Clear Cache

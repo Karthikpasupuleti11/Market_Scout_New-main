@@ -227,7 +227,7 @@
             },
             "targets": [
                 {
-                    "expr": "histogram_quantile(0.95, sum(rate(api_request_duration_seconds_bucket{endpoint='/run-agent'}[5m])) by (le))",
+                    "expr": "histogram_quantile(0.95, sum(rate(api_request_duration_seconds_bucket{endpoint='/run-agent'}[5m])) by (le)) or vector(0)",
                     "legendFormat": "p95",
                     "refId": "A"
                 }
@@ -424,17 +424,17 @@
             },
             "targets": [
                 {
-                    "expr": "increase(pipeline_runs_total{status='completed'}[5m])",
+                    "expr": "sum(increase(pipeline_runs_total{status='completed'}[$__rate_interval])) or vector(0)",
                     "legendFormat": "✅ Completed",
                     "refId": "A"
                 },
                 {
-                    "expr": "increase(pipeline_runs_total{status='error'}[5m])",
+                    "expr": "sum(increase(pipeline_runs_total{status='error'}[$__rate_interval])) or vector(0)",
                     "legendFormat": "❌ Error",
                     "refId": "B"
                 },
                 {
-                    "expr": "increase(pipeline_runs_total{status='guardrail_blocked'}[5m])",
+                    "expr": "sum(increase(pipeline_runs_total{status='guardrail_blocked'}[$__rate_interval])) or vector(0)",
                     "legendFormat": "🛡️ Blocked",
                     "refId": "C"
                 }
@@ -538,7 +538,7 @@
             },
             "targets": [
                 {
-                    "expr": "histogram_quantile(0.95, sum(rate(node_latency_seconds_bucket[5m])) by (le, node_name))",
+                    "expr": "histogram_quantile(0.95, sum by (le, node_name) (rate(node_latency_seconds_bucket[$__rate_interval]))) and on(node_name) (sum by (node_name) (rate(node_latency_seconds_count[$__rate_interval])) > 0)",
                     "legendFormat": "{{node_name}}",
                     "refId": "A"
                 }
@@ -546,6 +546,7 @@
             "fieldConfig": {
                 "defaults": {
                     "unit": "s",
+                    "noValue": "0",
                     "custom": {
                         "drawStyle": "line",
                         "lineInterpolation": "smooth",
@@ -735,7 +736,7 @@
             },
             "targets": [
                 {
-                    "expr": "histogram_quantile(0.95, sum(rate(llm_call_duration_seconds_bucket[5m])) by (le, agent_name))",
+                    "expr": "histogram_quantile(0.95, sum by (le, agent_name) (rate(llm_call_duration_seconds_bucket[$__rate_interval]))) and on(agent_name) (sum by (agent_name) (rate(llm_call_duration_seconds_count[$__rate_interval])) > 0)",
                     "legendFormat": "{{agent_name}}",
                     "refId": "A"
                 }
@@ -792,13 +793,16 @@
             },
             "targets": [
                 {
-                    "expr": "increase(feature_confidence_score_bucket[30m])",
+                    "expr": "sum by (le) (increase(feature_confidence_score_bucket{le!=\"+Inf\"}[$__range])) or vector(0)",
                     "legendFormat": "≤ {{le}}",
-                    "refId": "A"
+                    "refId": "A",
+                    "format": "time_series",
+                    "instant": false
                 }
             ],
             "fieldConfig": {
                 "defaults": {
+                    "noValue": "0",
                     "custom": {
                         "drawStyle": "bars",
                         "fillOpacity": 60,
@@ -1259,18 +1263,19 @@
             },
             "targets": [
                 {
-                    "expr": "increase(node_executions_total{status='success'}[5m])",
+                    "expr": "sum by (node_name) (increase(node_executions_total{status='success'}[$__rate_interval])) or vector(0)",
                     "legendFormat": "✅ {{node_name}}",
                     "refId": "A"
                 },
                 {
-                    "expr": "increase(node_executions_total{status='failure'}[5m])",
+                    "expr": "sum by (node_name) (increase(node_executions_total{status='failure'}[$__rate_interval])) or vector(0)",
                     "legendFormat": "❌ {{node_name}}",
                     "refId": "B"
                 }
             ],
             "fieldConfig": {
                 "defaults": {
+                    "noValue": "0",
                     "custom": {
                         "drawStyle": "bars",
                         "fillOpacity": 70,
