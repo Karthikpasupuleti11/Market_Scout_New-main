@@ -12,10 +12,22 @@
     border-right: 1px solid var(--border-subtle);
     display: flex;
     flex-direction: column;
-    z-index: 100;
+    z-index: 150;
     overflow-y: auto;
     padding-top: 20px;
     box-shadow: 6px 0 18px rgba(15, 23, 42, 0.05);
+    transition: transform 0.25s ease;
+}
+
+/* ── Mobile drawer behavior ──────────────────────────────────── */
+@media (max-width: 1024px) {
+    .sidebar {
+        transform: translateX(-100%);
+        width: min(280px, 80vw);
+    }
+    .sidebar.mobile-open {
+        transform: translateX(0);
+    }
 }
 
 /* ── Brand ─────────────────────────────────────────────────────── */

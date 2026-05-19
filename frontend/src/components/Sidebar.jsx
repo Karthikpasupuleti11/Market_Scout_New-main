@@ -27,18 +27,18 @@ const SECONDARY_NAV = [
 ];
 
 const EXTERNAL_LINKS = [
-    { href: 'http://localhost:8000/docs', label: 'API Docs',   icon: <HiOutlineChartBar /> },
-    { href: 'http://localhost:9090',      label: 'Prometheus', icon: <SiPrometheus /> },
-    { href: 'http://localhost:3000',      label: 'Grafana',    icon: <SiGrafana /> },
+    { href: 'http://api.market-scout.me/docs', label: 'API Docs',   icon: <HiOutlineChartBar /> },
+    { href: 'http://metrics.market-scout.me',      label: 'Prometheus', icon: <SiPrometheus /> },
+    { href: 'http://grafana.market-scout.me',      label: 'Grafana',    icon: <SiGrafana /> },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ mobileOpen = false, onClose }) {
     const location = useLocation();
     const [settingsOpen, setSettingsOpen] = useState(false);
 
     return (
         <>
-            <aside className="sidebar">
+            <aside className={`sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
 
                 {/* ── Navigation ──────────────────────────────────── */}
                 <nav className="sidebar-nav">
