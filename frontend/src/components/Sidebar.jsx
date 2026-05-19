@@ -13,6 +13,7 @@ import {
 } from 'react-icons/hi';
 import { SiPrometheus, SiGrafana } from 'react-icons/si';
 import { getHealth } from '../api';
+import { DOCS_URL, PROMETHEUS_URL, GRAFANA_URL, FLOWER_URL } from '../config/urls';
 import SettingsPanel from './SettingsPanel';
 import './Sidebar.css';
 
@@ -29,10 +30,10 @@ const SECONDARY_NAV = [
 ];
 
 const EXTERNAL_LINKS = [
-    { href: 'http://api.market-scout.me/docs', label: 'API Docs',   icon: <HiOutlineChartBar /> },
-    { href: 'http://metrics.market-scout.me',      label: 'Prometheus', icon: <SiPrometheus /> },
-    { href: 'http://grafana.market-scout.me',      label: 'Grafana',    icon: <SiGrafana /> },
-    {href: 'https://flower.market-scout.me', label: 'Flower Tasks', icon: <HiOutlineLightningBolt /> },
+    { href: DOCS_URL, label: 'API Docs', icon: <HiOutlineChartBar /> },
+    { href: PROMETHEUS_URL, label: 'Prometheus', icon: <SiPrometheus /> },
+    { href: GRAFANA_URL, label: 'Grafana', icon: <SiGrafana /> },
+    { href: FLOWER_URL, label: 'Flower Tasks', icon: <HiOutlineLightningBolt /> },
 ];
 
 export default function Sidebar({ mobileOpen = false, onClose }) {

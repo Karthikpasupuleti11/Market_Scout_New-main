@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, NavLink, Link, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, Link, Navigate, useLocation } from 'react-router-dom';
 import { HiOutlineInformationCircle, HiOutlineQuestionMarkCircle } from 'react-icons/hi';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { PipelineProvider } from './contexts/PipelineContext';
@@ -16,17 +16,9 @@ import Schedule from './pages/Schedule';
 import About from './pages/About';
 
 
-function TopBar({ onStartTour, onToggleSidebar, sidebarOpen }) {
+function TopBar({ onStartTour }) {
   return (
     <div className="topbar">
-      <button
-        className="topbar-hamburger"
-        onClick={onToggleSidebar}
-        aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
-        aria-expanded={sidebarOpen}
-      >
-        {sidebarOpen ? <HiX /> : <HiMenu />}
-      </button>
       <Link to="/" className="topbar-brand" aria-label="Go to Overview">
         <img src="/assets/logo.png" alt="Market Scout" className="topbar-logo" />
         <div className="topbar-brand-text">
@@ -75,11 +67,7 @@ function AppContent() {
 
   return (
     <div className={`app-layout ${sidebarOpen ? 'sidebar-open' : ''}`}>
-      <TopBar
-        onStartTour={() => setTourOpen(true)}
-        onToggleSidebar={() => setSidebarOpen(v => !v)}
-        sidebarOpen={sidebarOpen}
-      />
+      <TopBar onStartTour={() => setTourOpen(true)} />
       <div className="app-body">
         <Sidebar mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         {sidebarOpen && (

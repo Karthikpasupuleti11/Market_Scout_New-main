@@ -22,7 +22,7 @@ def enqueue_pipeline_or_cache(
         lookup_cached_report,
         sanitise_company_name,
     )
-    from celery_app.tasks import run_pipeline_task, serve_cached_report_task
+    from tasks.pipeline_tasks import run_pipeline_task, serve_cached_report_task
 
     company = sanitise_company_name(company_name)
     if not company:

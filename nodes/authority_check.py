@@ -29,65 +29,24 @@ async def authority_check_node(state: GraphState) -> Dict[str, Any]:
     if not articles:
         return {"filtered_results": []}
 
+    from app.config import settings
+
+    batch_size = max(1, settings.LLM_BATCH_AUTHORITY)
     validated: List[Dict[str, Any]] = []
 
-    for article in articles:
-        title = article.get("title", "N/A")
-        url = article.get("url", "")
+    for batch in chunk_list(articles, batch_size):
+        validated.extend(await _classify_batch_async(batch, company_name))
 
-    prompt = f"""You are an enterprise source-credibility classifier.
-
-Determine if this article is an OFFICIAL or PRIMARY technical source for {company_name}.
-
-PRIMARY sources include:
-  - Official company blogs, docs, or changelogs
-  - GitHub repositories owned by {company_name}
-  - First-party developer documentation
-  - Official press releases with technical detail
-
-SECONDARY sources include:
-  - News aggregation sites reporting about {company_name}
-  - Third-party commentary or analysis
-  - Community discussions
-
-Title: {title}
-URL: {url}
-
-Respond with ONLY one word: PRIMARY or SECONDARY"""
-
-    messages = [
-        {
-            "role": "system",
-            "content": "You are a strict source classifier. Respond with one word.",
-        },
-        {"role": "user", "content": prompt},
-    ]
-
-        try:
-            response = await invoke_llm(messages, temperature=0.0, max_tokens=10)
-            decision = response.strip().upper()
-
-        if "PRIMARY" in decision:
-            logger.debug("AUTHORITY — PRIMARY: %s", url[:60])
-            return article
-
-        article_copy = dict(article)
-        article_copy["authority_score"] = article_copy.get("authority_score", 0.5) * 0.7
-        logger.debug("AUTHORITY — SECONDARY (reduced score): %s", url[:60])
-        return article_copy
-
-    except Exception as exc:
-        logger.warning(
-            "AUTHORITY — LLM error for '%s': %s — defaulting to include",
-            url[:40],
-            exc,
-        )
-        return article
+    logger.info("AUTHORITY CHECK — %d articles passed", len(validated))
+    return {"filtered_results": validated}
 
 
-def _classify_batch(articles: List[Dict[str, Any]], company_name: str) -> List[Dict[str, Any]]:
+async def _classify_batch_async(
+    articles: List[Dict[str, Any]], company_name: str
+) -> List[Dict[str, Any]]:
+    """Classify a batch of articles; falls back to per-article on failure."""
     if len(articles) == 1:
-        return [_classify_one(articles[0], company_name)]
+        return [await _classify_one_async(articles[0], company_name)]
 
     blocks = []
     for i, a in enumerate(articles):
@@ -116,7 +75,7 @@ tier must be exactly PRIMARY or SECONDARY."""
     ]
 
     try:
-        response = invoke_llm(
+        response = await invoke_llm(
             messages,
             temperature=0.0,
             max_tokens=min(256, 32 * len(articles) + 64),
@@ -150,34 +109,71 @@ tier must be exactly PRIMARY or SECONDARY."""
                 copy["authority_score"] = copy.get("authority_score", 0.5) * 0.7
                 out.append(copy)
         return out
+
     except Exception as exc:
         logger.warning(
             "AUTHORITY — Batch failed (%d articles): %s — per-article fallback",
             len(articles),
             exc,
         )
-        return [_classify_one(a, company_name) for a in articles]
+        results = []
+        for a in articles:
+            results.append(await _classify_one_async(a, company_name))
+        return results
 
 
-def authority_check_node(state: GraphState) -> Dict[str, Any]:
-    articles = state.get("filtered_results", [])
-    company_name = state.get("company_name", "")
-    logger.info(
-        "AUTHORITY CHECK — Evaluating %d articles for '%s'",
-        len(articles),
-        company_name,
-    )
+async def _classify_one_async(
+    article: Dict[str, Any], company_name: str
+) -> Dict[str, Any]:
+    """Classify a single article via LLM."""
+    title = article.get("title", "N/A")
+    url = article.get("url", "")
 
-    if not articles:
-        return {"filtered_results": []}
+    prompt = f"""You are an enterprise source-credibility classifier.
 
-    from app.config import settings
+Determine if this article is an OFFICIAL or PRIMARY technical source for {company_name}.
 
-    batch_size = max(1, settings.LLM_BATCH_AUTHORITY)
-    validated: List[Dict[str, Any]] = []
+PRIMARY sources include:
+  - Official company blogs, docs, or changelogs
+  - GitHub repositories owned by {company_name}
+  - First-party developer documentation
+  - Official press releases with technical detail
 
-    for batch in chunk_list(articles, batch_size):
-        validated.extend(_classify_batch(batch, company_name))
+SECONDARY sources include:
+  - News aggregation sites reporting about {company_name}
+  - Third-party commentary or analysis
+  - Community discussions
 
-    logger.info("AUTHORITY CHECK — %d articles passed", len(validated))
-    return {"filtered_results": validated}
+Title: {title}
+URL: {url}
+
+Respond with ONLY one word: PRIMARY or SECONDARY"""
+
+    messages = [
+        {
+            "role": "system",
+            "content": "You are a strict source classifier. Respond with one word.",
+        },
+        {"role": "user", "content": prompt},
+    ]
+
+    try:
+        response = await invoke_llm(messages, temperature=0.0, max_tokens=10)
+        decision = response.strip().upper()
+
+        if "PRIMARY" in decision:
+            logger.debug("AUTHORITY — PRIMARY: %s", url[:60])
+            return article
+
+        article_copy = dict(article)
+        article_copy["authority_score"] = article_copy.get("authority_score", 0.5) * 0.7
+        logger.debug("AUTHORITY — SECONDARY (reduced score): %s", url[:60])
+        return article_copy
+
+    except Exception as exc:
+        logger.warning(
+            "AUTHORITY — LLM error for '%s': %s — defaulting to include",
+            url[:40],
+            exc,
+        )
+        return article

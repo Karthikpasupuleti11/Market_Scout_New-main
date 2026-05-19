@@ -2,6 +2,9 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
+# Ensure project-root packages (observability, tasks, graph, etc.) resolve in all processes
+ENV PYTHONPATH=/app
+
 # System deps for lxml, Pillow (newspaper3k), PostgreSQL, and Playwright
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc libpq-dev libxml2-dev libxslt1-dev \
@@ -19,6 +22,9 @@ RUN pip install --default-timeout=1000 --no-cache-dir --extra-index-url https://
 RUN playwright install chromium
 
 COPY . .
+
+# Fail the build early if core packages were not copied into the image
+RUN test -f /app/observability/metrics.py && test -f /app/tasks/pipeline_tasks.py
 
 EXPOSE 8000
 

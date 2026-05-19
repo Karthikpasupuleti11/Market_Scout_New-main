@@ -6,7 +6,7 @@ Falls back to per-article calls if JSON parse fails.
 """
 
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 from graph.state import GraphState
 from llm.nvidia_client import invoke_llm
@@ -36,7 +36,7 @@ async def content_filter_node(state: GraphState) -> Dict[str, Any]:
         text_snippet = article.get("article_text", "")[:600]
         url = article.get("url", "")
 
-    prompt = f"""You are an enterprise content classifier for a Market Intelligence system.
+        prompt = f"""You are an enterprise content classifier for a Market Intelligence system.
 
 Classify this article's primary intent:
 
@@ -61,13 +61,13 @@ Content excerpt:
 
 Respond with ONLY one word: ACCEPT or REJECT"""
 
-    messages = [
-        {
-            "role": "system",
-            "content": "You are a strict binary classifier. Respond with exactly one word.",
-        },
-        {"role": "user", "content": prompt},
-    ]
+        messages = [
+            {
+                "role": "system",
+                "content": "You are a strict binary classifier. Respond with exactly one word.",
+            },
+            {"role": "user", "content": prompt},
+        ]
 
         try:
             response = await invoke_llm(messages, temperature=0.0, max_tokens=10)

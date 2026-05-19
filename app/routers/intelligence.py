@@ -28,7 +28,7 @@ async def run_agent(request: AgentRequest):
 )
 async def get_task_status(task_id: str):
     """Status values: PENDING, STARTED, PROGRESS, SUCCESS, FAILURE, RETRY, REVOKED."""
-    from celery_app.tasks import run_pipeline_task
+    from tasks.pipeline_tasks import run_pipeline_task
 
     result = run_pipeline_task.AsyncResult(task_id)
     response: dict = {"task_id": task_id, "status": result.status}

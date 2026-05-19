@@ -1,4 +1,6 @@
-const API_BASE = 'https://api.market-scout.me';
+import { API_BASE } from './config/urls';
+
+export { API_BASE };
 
 function getSessionId() {
     let sid = localStorage.getItem('rag_session_id');
@@ -196,18 +198,5 @@ export async function clearStorage() {
         const err = await res.json().catch(() => ({ detail: res.statusText }));
         throw new Error(err.detail || `Error ${res.status}`);
     }
-    return res.json();
-}
-
-export async function getTaskStatus(taskId) {
-
-    const res = await fetch(
-        `${API_BASE}/task-status/${taskId}`
-    );
-
-    if (!res.ok) {
-        throw new Error(`Error ${res.status}`);
-    }
-
     return res.json();
 }

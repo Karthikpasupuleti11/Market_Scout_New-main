@@ -13,15 +13,12 @@ import {
     HiOutlineSortDescending,
     HiOutlineXCircle,
     HiOutlineChatAlt2,
-    HiOutlinePaperAirplane,
     HiOutlineSparkles,
-    HiOutlineChatAlt2,
 } from 'react-icons/hi';
 import { generateReportPDF } from '../utils/pdfExport';
 import ReportAssistant from '../components/ReportAssistant';
 import { formatDateTime } from '../utils/formatDate';
 import './RunPipeline.css';
-import { askRagQuestion } from '../api';
 
 const SUGGESTIONS = ['Google', 'OpenAI', 'Microsoft', 'Anthropic', 'Meta AI', 'Tesla'];
 
@@ -142,7 +139,6 @@ export default function RunPipeline() {
         setExpandedSignals(new Set());
         setFilterCategory('all');
         setFilterConfidence('all');
-        setRagMessages([]);
         await executePipeline(company);
     };
 
@@ -222,47 +218,6 @@ export default function RunPipeline() {
 
     const strategicDirections = useMemo(() =>
         deriveStrategicDirections(report?.features), [report]);
-
-    // ── RAG handler — multi-turn ─────────────────────────────────
-    const handleAskReport = async () => {
-        const q = ragQuestion.trim();
-        if (!q || ragLoading) return;
-
-        setRagMessages(prev => [...prev, { role: 'user', text: q }]);
-        setRagQuestion('');
-        setRagLoading(true);
-
-        try {
-            const res = await askRagQuestion(q);
-            setRagMessages(prev => [
-                ...prev,
-                { role: 'ai', text: res.answer, sources: res.sources || [] }
-            ]);
-        } catch {
-            setRagMessages(prev => [
-                ...prev,
-                { role: 'ai', text: 'Unable to generate an answer. Please try again.', sources: [] }
-            ]);
-        } finally {
-            setRagLoading(false);
-            ragInputRef.current?.focus();
-        }
-    };
-
-    const handleRagKeyDown = (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleAskReport();
-        }
-    };
-
-    // Suggested starter questions
-    const STARTER_QUESTIONS = [
-        'What are the top strategic risks?',
-        'Summarise the key AI signals',
-        'Which signals have highest confidence?',
-        'What competitive threats exist?',
-    ];
 
     const hasResults = !!(result && report);
 
@@ -540,10 +495,9 @@ export default function RunPipeline() {
                                             index={i}
                                             isExpanded={expandedSignals.has(i)}
                                             onToggle={() => toggleSignal(i)}
-                                            onAsk={(text) => {
-                                                setRagQuestion(text);
-                                                setSidebarOpen(true);
-                                                setTimeout(() => ragInputRef.current?.focus(), 100);
+                                            onAsk={() => {
+                                                setAssistantAutoOpen(true);
+                                                scrollToReportAssistant();
                                             }}
                                         />
                                     ))}
@@ -600,25 +554,26 @@ export default function RunPipeline() {
                     </div>
                 </div>
             )}
+            </div>
         </div>
     );
 }
 
 /* ── Signal Card ────────────────────────────────────────────────── */
-function SignalCard({ signal: f, index, isExpanded, onToggle, onAsk }) {
-    const score = f.confidence_score ?? f.confidence;
+function SignalCard({ signal, index, isExpanded, onToggle, onAsk }) {
+    const score = signal.confidence_score ?? signal.confidence;
     const pct = score != null ? Math.round(score * 100) : null;
     const level = score >= 0.7 ? 'high' : score >= 0.4 ? 'mid' : 'low';
-    const tag = getCategoryTag(f.category);
+    const tag = getCategoryTag(signal.category);
 
     return (
         <div className={`signal-card ${isExpanded ? 'expanded' : ''} fade-in-up`}>
             <div className="signal-header" onClick={onToggle}>
-                <div className="signal-rank">{f.rank || index + 1}</div>
+                <div className="signal-rank">{signal.rank || index + 1}</div>
                 <div className="signal-title-area">
-                    <h4>{f.title || f.feature_title || 'Untitled Signal'}</h4>
+                    <h4>{signal.title || signal.feature_title || 'Untitled Signal'}</h4>
                 </div>
-                <span className={`insight-tag ${tag}`}>{f.category || 'General'}</span>
+                <span className={`insight-tag ${tag}`}>{signal.category || 'General'}</span>
                 {pct != null && (
                     <div className="confidence-bar">
                         <div className="confidence-bar-track">
@@ -637,41 +592,41 @@ function SignalCard({ signal: f, index, isExpanded, onToggle, onAsk }) {
 
             {isExpanded && (
                 <div className="signal-expanded fade-in">
-                    {(f.description || f.feature_summary) && (
+                    {(signal.description || signal.feature_summary) && (
                         <p className="signal-description">
-                            {f.description || f.feature_summary}
+                            {signal.description || signal.feature_summary}
                         </p>
                     )}
-                    {f.impact_assessment && (
+                    {signal.impact_assessment && (
                         <div className="signal-impact">
                             <span className="impact-label">Impact</span>
-                            <span className="impact-text">{f.impact_assessment}</span>
+                            <span className="impact-text">{signal.impact_assessment}</span>
                         </div>
                     )}
                     <div className="signal-footer">
-                        {f.key_metrics && f.key_metrics.length > 0 && (
+                        {signal.key_metrics && signal.key_metrics.length > 0 && (
                             <div className="signal-metrics">
-                                {f.key_metrics.map((m, j) => (
+                                {signal.key_metrics.map((m, j) => (
                                     <span key={j} className="metric-chip">{m}</span>
                                 ))}
                             </div>
                         )}
-                        {f.source_count && (
-                            <span className="signal-meta">{f.source_count} source{f.source_count > 1 ? 's' : ''}</span>
+                        {signal.source_count && (
+                            <span className="signal-meta">{signal.source_count} source{signal.source_count > 1 ? 's' : ''}</span>
                         )}
                         {/* Ask AI about this signal */}
                         <button
                             className="signal-ask-ai-btn"
                             onClick={(e) => {
                                 e.stopPropagation();
-                                onAsk(`Tell me more about: ${f.title || f.feature_title}`);
+                                onAsk(`Tell me more about: ${signal.title || signal.feature_title}`);
                             }}
                         >
                             <HiOutlineSparkles /> Ask AI
                         </button>
-                        {f.source_url && (
+                        {signal.source_url && (
                             <a
-                                href={f.source_url}
+                                href={signal.source_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="signal-source-link"
