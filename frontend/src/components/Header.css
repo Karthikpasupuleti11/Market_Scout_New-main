@@ -37,6 +37,17 @@
     background: var(--success-bg);
     border-radius: 20px;
     border: 1px solid rgba(16, 185, 129, 0.2);
+    transition: all 0.3s ease;
+}
+
+.header-status.disconnected {
+    background: rgba(239, 68, 68, 0.08);
+    border-color: rgba(239, 68, 68, 0.2);
+}
+
+.header-status.checking {
+    background: rgba(245, 158, 11, 0.08);
+    border-color: rgba(245, 158, 11, 0.2);
 }
 
 .status-dot {
@@ -45,10 +56,30 @@
     border-radius: 50%;
     background: var(--success);
     animation: pulse-glow 2s ease-in-out infinite;
+    transition: background 0.3s ease;
+}
+
+.status-dot.disconnected {
+    background: #ef4444;
+    animation: none;
+}
+
+.status-dot.checking {
+    background: #f59e0b;
+    animation: pulse-glow 1s ease-in-out infinite;
 }
 
 .status-text {
     font-size: 0.75rem;
     font-weight: 600;
     color: var(--success);
+    transition: color 0.3s ease;
+}
+
+.header-status.disconnected .status-text {
+    color: #ef4444;
+}
+
+.header-status.checking .status-text {
+    color: #f59e0b;
 }

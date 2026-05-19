@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 
 import {
   HiOutlineSearch,
@@ -11,9 +11,12 @@ import {
   HiOutlineTrash,
   HiOutlineExclamationCircle,
   HiOutlineX,
+  HiOutlineChatAlt2,
 } from "react-icons/hi";
 import { getReports, deleteReport } from "../api";
 import { generateReportPDF } from "../utils/pdfExport";
+import ReportAssistant from "../components/ReportAssistant";
+import { formatDateTime } from '../utils/formatDate';
 import './Reports.css';
 
 export default function Reports() {
@@ -25,6 +28,31 @@ export default function Reports() {
   const [searched, setSearched] = useState(false);
   const [expanded, setExpanded] = useState(null);
   const [pdfLoadingIdx, setPdfLoadingIdx] = useState(null);
+  const [assistantOpenIdx, setAssistantOpenIdx] = useState(null);
+
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.state?.autoOpenCompany) {
+      const comp = location.state.autoOpenCompany;
+      setCompany(comp);
+      setLoading(true);
+      setSearched(true);
+      
+      getReports(comp)
+        .then(data => {
+          const arr = Array.isArray(data) ? data : [data];
+          setReports(arr);
+          if (arr.length > 0) {
+            setExpanded(0);
+          }
+        })
+        .catch(() => setReports([]))
+        .finally(() => setLoading(false));
+
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   // Delete modal state
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -49,6 +77,18 @@ export default function Reports() {
       setPdfLoadingIdx(null);
     }
   };
+
+  const scrollToReportAssistant = useCallback((idx, e) => {
+    e?.stopPropagation?.();
+    setExpanded(idx);
+    setAssistantOpenIdx(idx);
+    window.setTimeout(() => {
+      document.getElementById(`report-assistant-section-${idx}`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }, 220);
+  }, []);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -176,7 +216,7 @@ export default function Reports() {
                     <h3>{report.company_name || company}</h3>
                     <div className="report-meta-row">
                       {report.created_at && (
-                        <span>{new Date(report.created_at).toLocaleDateString([], { dateStyle: 'medium' })}</span>
+                        <span>{formatDateTime(report.created_at)}</span>
                       )}
                       <span className="meta-dot">·</span>
                       <span>{report.total_features || 0} signals</span>
@@ -193,25 +233,38 @@ export default function Reports() {
                     </div>
                   </div>
                   <div className="report-actions">
-                    <button
-                      className="btn btn-pdf btn-pdf-sm"
-                      onClick={e => { e.stopPropagation(); handleDownloadPDF(report, i); }}
-                      disabled={pdfLoadingIdx === i}
-                      title="Download as PDF"
-                    >
-                      {pdfLoadingIdx === i ? (
-                        <><span className="spinner spinner-sm" /> PDF</>
-                      ) : (
-                        <><HiOutlineDownload /> PDF</>
-                      )}
-                    </button>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={e => { e.stopPropagation(); askDelete(report, i); }}
-                      title="Delete report"
-                    >
-                      <HiOutlineTrash />
-                    </button>
+                    <div className="report-actions-stack">
+                      <button
+                        className="btn btn-pdf btn-pdf-sm"
+                        onClick={e => { e.stopPropagation(); handleDownloadPDF(report, i); }}
+                        disabled={pdfLoadingIdx === i}
+                        title="Download as PDF"
+                        type="button"
+                      >
+                        {pdfLoadingIdx === i ? (
+                          <><span className="spinner spinner-sm" /> PDF</>
+                        ) : (
+                          <><HiOutlineDownload /> PDF</>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-report-assistant-jump btn-pdf-sm"
+                        onClick={e => scrollToReportAssistant(i, e)}
+                        title="Jump to Report Assistant below"
+                      >
+                        <HiOutlineChatAlt2 />
+                        Assistant
+                      </button>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={e => { e.stopPropagation(); askDelete(report, i); }}
+                        title="Delete report"
+                        type="button"
+                      >
+                        <HiOutlineTrash /> Delete
+                      </button>
+                    </div>
                     <span className="report-expand-icon">
                       {isOpen ? <HiChevronUp /> : <HiChevronDown />}
                     </span>
@@ -243,8 +296,15 @@ export default function Reports() {
                         </div>
                       </div>
                     )}
-                  </div>
-                )}
+
+                    <div
+                      id={`report-assistant-section-${i}`}
+                      className="report-assistant-anchor"
+                    >
+                      <ReportAssistant report={report} companyName={company} autoOpen={assistantOpenIdx === i} />
+                    </div>
+                    </div>
+                  )}
               </div>
             );
           })}
@@ -270,7 +330,7 @@ export default function Reports() {
                 Are you sure you want to delete the report for{' '}
                 <strong className="danger-text">{deleteTarget.report.company_name || company}</strong>
                 {deleteTarget.report.created_at && (
-                  <> from <strong>{new Date(deleteTarget.report.created_at).toLocaleDateString([], { dateStyle: 'medium' })}</strong></>
+                  <> from <strong>{formatDateTime(deleteTarget.report.created_at)}</strong></>
                 )}?
               </p>
               <p className="modal-warning">

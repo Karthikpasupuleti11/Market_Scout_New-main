@@ -1,16 +1,33 @@
 import { createContext, useContext, useState, useRef, useCallback } from 'react';
-import { runPipeline, getTaskStatus } from '../api';
+import { submitPipeline, getTaskStatus } from '../api';
+import { formatApiError } from '../utils/formatApiError';
 import { useSettings } from './SettingsContext';
+import { useNotifications } from './NotificationContext';
 
 /* ═══════════════════════════════════════════════════════════════════
-   PIPELINE CONTEXT — Persists pipeline execution state across routes
-   so navigating away and back keeps the animation + result intact.
+   PIPELINE CONTEXT — Celery async pipeline with task polling.
+   Progress stages come from GET /task/{id} (Celery PROGRESS meta).
    ═══════════════════════════════════════════════════════════════════ */
+
+// Map backend node names → frontend stage index
+const NODE_TO_STAGE = {
+    guardrails:         0,
+    search_agent:       1,   // "Planning" in the graph = search agent planning queries
+    scraper_agent:      2,   // "Searching" + "Scraping"
+    date_validation:    3,
+    content_filter:     4,
+    authority_check:    5,
+    feature_extraction: 6,
+    verification:       7,
+    scoring:            8,
+    synthesis:          9,
+};
 
 const PipelineContext = createContext(null);
 
 export function PipelineProvider({ children }) {
-    const { settings } = useSettings();
+    const { settings, updateAnalysis } = useSettings();
+    const { addNotification } = useNotifications();
 
     // ── Core execution state ─────────────────────────────────────
     const [company, setCompany] = useState('');
@@ -18,132 +35,136 @@ export function PipelineProvider({ children }) {
     const [result, setResult] = useState(null);
     const [error, setError] = useState('');
 
-    // ── Pipeline animation state (preserved across tab switches) ─
-    const [activeStage, setActiveStage] = useState(0);
+    // ── Pipeline animation state (from Celery task progress) ───────
+    const [activeStage, setActiveStage] = useState(-1);
+    const [completedStages, setCompletedStages] = useState(new Set());
+    const [stageLatencies, setStageLatencies] = useState({});
     const [elapsed, setElapsed] = useState(0);
 
-    // ── Refs (not serialisable, but survive re-renders) ──────────
+    // ── Refs ──────────────────────────────────────────────────────
     const abortControllerRef = useRef(null);
-    const stageTimerRef = useRef(null);
     const clockTimerRef = useRef(null);
 
-    // ── Internal: start / stop the animation clocks ──────────────
-    const startClocks = useCallback(() => {
-        // Guard: don't double-start
-        if (stageTimerRef.current) return;
-
-        stageTimerRef.current = setInterval(() => {
-            setActiveStage(prev =>
-                prev < 10 ? prev + 1 : prev   // 11 stages → index 0-10
-            );
-        }, 5000);
-
+    // ── Internal: start / stop the elapsed clock ─────────────────
+    const startClock = useCallback(() => {
+        if (clockTimerRef.current) return;
         clockTimerRef.current = setInterval(() => {
             setElapsed(prev => prev + 1);
         }, 1000);
     }, []);
 
-    const stopClocks = useCallback(() => {
-        clearInterval(stageTimerRef.current);
+    const stopClock = useCallback(() => {
         clearInterval(clockTimerRef.current);
-        stageTimerRef.current = null;
         clockTimerRef.current = null;
     }, []);
 
-    // ── Public: execute the pipeline ─────────────────────────────
+    // ── Public: enqueue pipeline and poll Celery task status ─────
     const executePipeline = useCallback(async (companyName) => {
         if (!companyName.trim()) return;
 
         // Reset everything for a fresh run
-        stopClocks();
+        stopClock();
         setLoading(true);
         setError('');
         setResult(null);
-        setActiveStage(0);
+        setActiveStage(-1);
+        setCompletedStages(new Set());
+        setStageLatencies({});
         setElapsed(0);
         setCompany(companyName.trim());
 
         abortControllerRef.current = new AbortController();
-        startClocks();
+        startClock();
 
         try {
+            const data = await submitPipeline(companyName.trim(), {
+                signal: abortControllerRef.current.signal,
+                dateWindowDays: settings.analysis.timeWindow,
+                forceRefresh: settings.analysis.forceRefresh,
+            });
 
-    // ── Start Celery Task ─────────────────────
-    const taskResponse = await runPipeline(
-        companyName.trim(),
-        {
-            signal: abortControllerRef.current.signal,
-            dateWindowDays: settings.analysis.timeWindow,
-        }
-    );
+            const taskId = data.task_id;
+            const pollIntervalMs = data.from_cache ? 250 : 2000;
+            const maxPollMs = data.from_cache ? 60_000 : 600_000;
+            const pollStarted = Date.now();
 
-    const taskId = taskResponse.task_id;
+            let isDone = false;
+            while (!isDone && !abortControllerRef.current.signal.aborted) {
+                if (Date.now() - pollStarted > maxPollMs) {
+                    throw new Error(
+                        'Analysis is taking longer than expected. Check Celery worker logs or try again.'
+                    );
+                }
 
-    // ── Poll Task Status ──────────────────────
-    const pollInterval = setInterval(async () => {
+                const statusRes = await getTaskStatus(taskId);
+                
+                if (statusRes.status === 'PROGRESS' && statusRes.progress) {
+                    const prog = statusRes.progress;
+                    if (prog.current_node) {
+                        const stageIdx = NODE_TO_STAGE[prog.current_node];
+                        if (stageIdx !== undefined) setActiveStage(stageIdx);
+                    }
+                    if (prog.stages) {
+                        const newCompleted = new Set();
+                        const newLatencies = {};
+                        for (const [node, info] of Object.entries(prog.stages)) {
+                            const sIdx = NODE_TO_STAGE[node];
+                            if (sIdx !== undefined && info.status === 'done') {
+                                newCompleted.add(sIdx);
+                                newLatencies[sIdx] = info.elapsed || 0;
+                            }
+                        }
+                        setCompletedStages(newCompleted);
+                        setStageLatencies(newLatencies);
+                    }
+                } else if (statusRes.status === 'SUCCESS') {
+                    isDone = true;
+                    setActiveStage(Object.keys(NODE_TO_STAGE).length);
+                    setCompletedStages(new Set(Object.values(NODE_TO_STAGE)));
+                    setResult(statusRes.result);
+                    const featureCount = statusRes.result?.features?.length || 0;
+                    const fromCache = statusRes.result?.from_cache || data.from_cache;
+                    const cacheSource = statusRes.result?.cache_source || data.cache_source;
+                    const hadForceRefresh = data.force_refresh || data.cache_invalidated;
+                    addNotification(
+                        'success',
+                        `Analysis Complete: ${companyName.trim()}`,
+                        fromCache
+                            ? `Loaded cached report (${cacheSource || 'cache'}) with ${featureCount} signal${featureCount !== 1 ? 's' : ''}.`
+                            : hadForceRefresh
+                                ? `Fresh report generated (${featureCount} signal${featureCount !== 1 ? 's' : ''}) after clearing stored cache.`
+                                : `Report generated with ${featureCount} signal${featureCount !== 1 ? 's' : ''} detected.`
+                    );
+                    if (settings.analysis.forceRefresh) {
+                        updateAnalysis({ forceRefresh: false });
+                    }
+                } else if (statusRes.status === 'FAILURE') {
+                    isDone = true;
+                    throw new Error(statusRes.error || 'Pipeline execution failed');
+                }
 
-        try {
-
-            const statusData =
-                await getTaskStatus(taskId);
-
-            // SUCCESS
-            if (statusData.status === "SUCCESS") {
-
-                setResult(statusData.result);
-
-                clearInterval(pollInterval);
-
-                stopClocks();
-
-                setLoading(false);
+                if (!isDone) {
+                    await new Promise(r => setTimeout(r, pollIntervalMs));
+                }
             }
-
-            // FAILURE
-            else if (statusData.status === "FAILURE") {
-
-                setError("Pipeline execution failed");
-
-                clearInterval(pollInterval);
-
-                stopClocks();
-
-                setLoading(false);
+        } catch (err) {
+            const friendly = formatApiError(err);
+            if (err.name === 'AbortError' || abortControllerRef.current?.signal.aborted) {
+                setError('Pipeline stopped by user.');
+            } else {
+                setError(friendly);
+                addNotification(
+                    'error',
+                    `Analysis Failed: ${companyName.trim()}`,
+                    friendly
+                );
             }
-
-        } catch (pollErr) {
-
-            setError(
-                pollErr.message || "Polling failed"
-            );
-
-            clearInterval(pollInterval);
-
-            stopClocks();
-
+        } finally {
+            abortControllerRef.current = null;
+            stopClock();
             setLoading(false);
         }
-
-    }, 5000);
-
-} catch (err) {
-
-    if (err.name === 'AbortError') {
-
-        setError('Pipeline stopped by user.');
-
-    } else {
-
-        setError(
-            err.message || 'Pipeline execution failed'
-        );
-    }
-
-    stopClocks();
-
-    setLoading(false);
-}
-    }, [settings.analysis.timeWindow, startClocks, stopClocks]);
+    }, [settings.analysis.timeWindow, settings.analysis.forceRefresh, updateAnalysis, startClock, stopClock, addNotification]);
 
     // ── Public: stop the running pipeline ────────────────────────
     const stopPipeline = useCallback(() => {
@@ -154,15 +175,17 @@ export function PipelineProvider({ children }) {
 
     // ── Public: clear results to start fresh ─────────────────────
     const clearPipeline = useCallback(() => {
-        stopClocks();
+        stopClock();
         stopPipeline();
         setLoading(false);
         setResult(null);
         setError('');
-        setActiveStage(0);
+        setActiveStage(-1);
+        setCompletedStages(new Set());
+        setStageLatencies({});
         setElapsed(0);
         setCompany('');
-    }, [stopClocks, stopPipeline]);
+    }, [stopClock, stopPipeline]);
 
     return (
         <PipelineContext.Provider value={{
@@ -173,6 +196,8 @@ export function PipelineProvider({ children }) {
             result,
             error,
             activeStage,
+            completedStages,
+            stageLatencies,
             elapsed,
             // Actions
             executePipeline,

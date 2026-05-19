@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { getCompetitors, getHealth } from "../api";
+import { getCompetitors, getHealth, getDashboardStats } from "../api";
+import { useSettings } from "../contexts/SettingsContext";
 import {
   HiOutlineLightningBolt,
   HiOutlineDocumentText,
@@ -10,23 +11,28 @@ import {
   HiOutlineChevronRight,
 } from "react-icons/hi";
 import ThemeToggle from "./ThemeToggle";
+import { formatDateTime } from "../utils/formatDate";
 import './Dashboard.css';
 
 export default function Dashboard() {
   const [competitors, setCompetitors] = useState([]);
   const [health, setHealth] = useState(null);
+  const [dashStats, setDashStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { settings } = useSettings();
 
   useEffect(() => {
     async function load() {
       try {
-        const [compData, healthData] = await Promise.all([
+        const [compData, healthData, statsData] = await Promise.all([
           getCompetitors().catch(() => []),
           getHealth().catch(() => null),
+          getDashboardStats().catch(() => null),
         ]);
         setCompetitors(compData);
         setHealth(healthData);
+        setDashStats(statsData);
       } finally {
         setLoading(false);
       }
@@ -34,15 +40,29 @@ export default function Dashboard() {
     load();
   }, []);
 
-  const latestRunDate = competitors[0]?.created_at
-    ? new Date(competitors[0].created_at).toLocaleDateString([], { dateStyle: 'medium' })
+  // Derive dashboard KPIs from the latest report (not watchlist)
+  const latestReport = dashStats?.latest_report;
+
+  const latestRunDate = latestReport?.created_at
+    ? formatDateTime(latestReport.created_at)
     : 'No runs yet';
 
-  const recentFocus = competitors[0]?.name || 'No company yet';
+  const recentFocus = latestReport?.company_name || 'No company yet';
 
-  const freshnessLabel = competitors[0]?.created_at
-    ? `${Math.max(0, Math.floor((Date.now() - new Date(competitors[0].created_at).getTime()) / (1000 * 60 * 60 * 24)))} days ago`
+  const freshnessLabel = latestReport?.created_at
+    ? (() => {
+        let d = latestReport.created_at;
+        if (typeof d === 'string' && !d.endsWith('Z') && !d.match(/[+-]\d{2}:?\d{2}$/)) d += 'Z';
+        const daysAgo = Math.max(0, Math.floor(
+          (Date.now() - new Date(d).getTime()) / (1000 * 60 * 60 * 24)
+        ));
+        if (daysAgo === 0) return 'Today';
+        if (daysAgo === 1) return '1 day ago';
+        return `${daysAgo} days ago`;
+      })()
     : 'Awaiting first run';
+
+  const recencyWindow = `${settings?.analysis?.timeWindow || 7} Days`;
 
   return (
     <div className="overview-page fade-in">
@@ -57,11 +77,9 @@ export default function Dashboard() {
             </div>
             <h1>Market Intelligence Overview</h1>
             <p>AI-powered competitive intelligence — discover, verify, and track technical signals from public sources in real-time.</p>
-            {competitors.length > 0 && (
+            {latestReport && (
               <div className="hero-last-run">
-                Last analysis: {competitors[0]?.created_at
-                  ? new Date(competitors[0].created_at).toLocaleDateString([], { dateStyle: 'medium' })
-                  : 'No runs yet'}
+                Last analysis: {latestRunDate} — {recentFocus}
               </div>
             )}
           </div>
@@ -86,7 +104,7 @@ export default function Dashboard() {
       <div className="stats-grid stagger">
         <StatCard
           icon={<HiOutlineEye />}
-          value={loading ? "—" : competitors.length}
+          value={loading ? "—" : (dashStats?.total_companies ?? competitors.length)}
           label="Tracked Companies"
           color="var(--info)"
           bg="var(--info-bg)"
@@ -107,7 +125,7 @@ export default function Dashboard() {
         />
         <StatCard
           icon={<HiOutlineLightningBolt />}
-          value="7 Days"
+          value={recencyWindow}
           label="Recency Window"
           color="var(--warning)"
           bg="var(--warning-bg)"

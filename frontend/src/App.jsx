@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, NavLink, Link, useLocation } from 'react-router-dom';
-import { HiOutlineBell, HiOutlineInformationCircle, HiMenu, HiX } from 'react-icons/hi';
+import { BrowserRouter, Routes, Route, NavLink, Link, Navigate } from 'react-router-dom';
+import { HiOutlineInformationCircle, HiOutlineQuestionMarkCircle } from 'react-icons/hi';
 import { SettingsProvider } from './contexts/SettingsContext';
-import { PipelineProvider } from './contexts/PipelineContext';   // ← NEW
+import { PipelineProvider } from './contexts/PipelineContext';
+import { NotificationProvider } from './contexts/NotificationContext';
+import NotificationPanel from './components/NotificationPanel';
 import Sidebar from './components/Sidebar';
 import GuidedTour, { hasTourBeenSeen } from './components/GuidedTour';
 import Dashboard from './pages/Dashboard';
@@ -41,20 +43,15 @@ function TopBar({ onStartTour, onToggleSidebar, sidebarOpen }) {
           <span>About Us</span>
         </NavLink>
         <button
-          className="tour-help-btn"
+          className="topbar-link"
           onClick={onStartTour}
           title="Take a guided tour"
           aria-label="Start guided tour"
         >
-          ?
+          <HiOutlineQuestionMarkCircle />
+          <span>Tour</span>
         </button>
-        <button className="topbar-bell" aria-label="Notifications">
-          <HiOutlineBell />
-          <span className="topbar-bell-dot" />
-        </button>
-        <div className="topbar-avatar" title="User">
-          <span>U</span>
-        </div>
+        <NotificationPanel />
       </div>
     </div>
   );
@@ -103,6 +100,7 @@ function AppContent() {
             <Route path="/about" element={<About />} />
             <Route path="/run" element={<RunPipeline />} />
             <Route path="/competitors" element={<Competitors />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
       </div>
@@ -118,13 +116,13 @@ function AppContent() {
 export default function App() {
   return (
     <SettingsProvider>
-      {/* PipelineProvider sits OUTSIDE BrowserRouter so state survives
-          route changes — the fetch + timers live here, not in the page */}
-      <PipelineProvider>
-        <BrowserRouter>
-          <AppContent />
-        </BrowserRouter>
-      </PipelineProvider>
+      <NotificationProvider>
+        <PipelineProvider>
+          <BrowserRouter>
+            <AppContent />
+          </BrowserRouter>
+        </PipelineProvider>
+      </NotificationProvider>
     </SettingsProvider>
   );
 }

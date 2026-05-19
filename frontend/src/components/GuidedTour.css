@@ -323,12 +323,72 @@
 /* ── Responsive ───────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .tour-tooltip {
-    width: calc(100vw - 32px);
-    left: 16px !important;
-    padding: 20px;
+    max-width: calc(100vw - 24px);
+    padding: 18px 20px 16px;
+    border-radius: 14px;
+  }
+
+  .tour-title {
+    font-size: 0.95rem;
+  }
+
+  .tour-desc {
+    font-size: 0.82rem;
+    margin-bottom: 14px;
   }
 
   .tour-dots {
     display: none;
+  }
+
+  .tour-arrow {
+    display: none;
+  }
+
+  .tour-step-counter {
+    margin-bottom: 10px;
+  }
+
+  .tour-nav {
+    padding-top: 10px;
+  }
+
+  .tour-skip-btn {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+  }
+
+  .tour-prev-btn {
+    padding: 6px 10px;
+    font-size: 0.78rem;
+  }
+
+  .tour-next-btn {
+    padding: 6px 16px;
+    font-size: 0.78rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .tour-tooltip {
+    padding: 14px 16px 12px;
+    border-radius: 12px;
+  }
+
+  .tour-title {
+    font-size: 0.88rem;
+  }
+
+  .tour-desc {
+    font-size: 0.78rem;
+    line-height: 1.5;
+  }
+
+  .tour-close {
+    width: 24px;
+    height: 24px;
+    top: 10px;
+    right: 10px;
+    font-size: 0.85rem;
   }
 }

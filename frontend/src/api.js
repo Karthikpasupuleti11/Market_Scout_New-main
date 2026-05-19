@@ -12,21 +12,43 @@ function getSessionId() {
 
 export { getSessionId };
 
-export async function runPipeline(companyName, options = {}) {
+async function parseErrorResponse(res) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    const detail = err.detail;
+    if (Array.isArray(detail)) {
+        return detail.map((d) => d.msg || JSON.stringify(d)).join('; ');
+    }
+    return detail || `Error ${res.status}`;
+}
+
+export async function submitPipeline(companyName, options = {}) {
     const res = await fetch(`${API_BASE}/run-agent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             company_name: companyName,
-            date_window_days: options.dateWindowDays,
-            session_id: getSessionId(),
+            date_window_days: options.dateWindowDays || 7,
+            force_refresh: options.forceRefresh || false,
         }),
         signal: options.signal,
     });
     if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(err.detail || `Error ${res.status}`);
+        throw new Error(await parseErrorResponse(res));
     }
+    return res.json();
+}
+
+export async function getTaskStatus(taskId) {
+    const res = await fetch(`${API_BASE}/task/${taskId}`);
+    if (!res.ok) {
+        throw new Error(await parseErrorResponse(res));
+    }
+    return res.json();
+}
+
+export async function getReadiness() {
+    const res = await fetch(`${API_BASE}/health/ready`);
+    if (!res.ok) throw new Error(`Error ${res.status}`);
     return res.json();
 }
 
@@ -58,6 +80,12 @@ export async function getCompetitors() {
 
 export async function getHealth() {
     const res = await fetch(`${API_BASE}/health`);
+    if (!res.ok) throw new Error(`Error ${res.status}`);
+    return res.json();
+}
+
+export async function getDashboardStats() {
+    const res = await fetch(`${API_BASE}/dashboard-stats`);
     if (!res.ok) throw new Error(`Error ${res.status}`);
     return res.json();
 }
@@ -102,6 +130,39 @@ export async function deleteSchedule(jobId) {
     }
 }
 
+// 🔹 RAG: Upload PDF
+export async function uploadRagPDF(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch(`${API_BASE}/rag/upload`, {
+        method: 'POST',
+        body: formData,
+    });
+
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || `Error ${res.status}`);
+    }
+
+    return res.json();
+}
+
+// 🔹 RAG: Index a report's structured data (no PDF needed)
+export async function indexReportForRag(reportData) {
+    const res = await fetch(`${API_BASE}/rag/index-report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reportData),
+    });
+
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || `Error ${res.status}`);
+    }
+
+    return res.json();
+}
 
 
 // 🔹 RAG: Ask Question

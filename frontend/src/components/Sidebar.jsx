@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
     HiOutlineGlobeAlt,
@@ -8,9 +8,11 @@ import {
     HiOutlineClock,
     HiOutlineChartBar,
     HiOutlineCog,
-    HiOutlineChatAlt2,
+    HiOutlineMenu,
+    HiOutlineX,
 } from 'react-icons/hi';
 import { SiPrometheus, SiGrafana } from 'react-icons/si';
+import { getHealth } from '../api';
 import SettingsPanel from './SettingsPanel';
 import './Sidebar.css';
 
@@ -30,15 +32,60 @@ const EXTERNAL_LINKS = [
     { href: 'http://api.market-scout.me/docs', label: 'API Docs',   icon: <HiOutlineChartBar /> },
     { href: 'http://metrics.market-scout.me',      label: 'Prometheus', icon: <SiPrometheus /> },
     { href: 'http://grafana.market-scout.me',      label: 'Grafana',    icon: <SiGrafana /> },
+    {href: 'https://flower.market-scout.me', label: 'Flower Tasks', icon: <HiOutlineLightningBolt /> },
 ];
 
 export default function Sidebar({ mobileOpen = false, onClose }) {
     const location = useLocation();
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [backendUp, setBackendUp] = useState(null); // null = checking, true = up, false = down
+    const intervalRef = useRef(null);
+
+    // Close sidebar on route change (mobile)
+    useEffect(() => {
+        setSidebarOpen(false);
+    }, [location.pathname]);
+
+    const toggleSidebar = useCallback(() => setSidebarOpen(prev => !prev), []);
+
+    useEffect(() => {
+        async function check() {
+            try {
+                await getHealth();
+                setBackendUp(true);
+            } catch {
+                setBackendUp(false);
+            }
+        }
+        check();
+        intervalRef.current = setInterval(check, 15000);
+        return () => clearInterval(intervalRef.current);
+    }, []);
+
+    const statusLabel = backendUp === null ? 'Checking…' : backendUp ? 'System Online' : 'System Offline';
+    const statusClass = backendUp === null ? 'checking' : backendUp ? 'online' : 'offline';
 
     return (
         <>
-            <aside className={`sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
+            {/* Hamburger button — visible on mobile only */}
+            <button
+                className="sidebar-hamburger"
+                onClick={toggleSidebar}
+                aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
+            >
+                {sidebarOpen ? <HiOutlineX /> : <HiOutlineMenu />}
+            </button>
+
+            {/* Backdrop — visible on mobile when sidebar open */}
+            {sidebarOpen && (
+                <div
+                    className="sidebar-backdrop visible"
+                    onClick={() => setSidebarOpen(false)}
+                />
+            )}
+
+            <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
 
                 {/* ── Navigation ──────────────────────────────────── */}
                 <nav className="sidebar-nav">
@@ -102,9 +149,9 @@ export default function Sidebar({ mobileOpen = false, onClose }) {
 
                 {/* ── Footer ──────────────────────────────────────── */}
                 <div className="sidebar-footer">
-                    <div className="footer-status">
-                        <span className="status-dot" />
-                        <span>System Online</span>
+                    <div className={`footer-status ${statusClass}`}>
+                        <span className={`status-dot ${statusClass}`} />
+                        <span>{statusLabel}</span>
                     </div>
                     <div className="footer-badge">v2.0</div>
                 </div>
@@ -118,3 +165,4 @@ export default function Sidebar({ mobileOpen = false, onClose }) {
         </>
     );
 }
+

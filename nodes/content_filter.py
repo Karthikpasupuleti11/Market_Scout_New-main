@@ -1,19 +1,16 @@
 """
 Market Intelligence Scout — Content Filter Node
 
-Deterministic node with LLM-based semantic gating.
-
-Responsibilities:
-  • Classify articles as TECHNICAL or REJECT
-  • Filter out: stock analysis, HR news, opinions, general news
-  • Only pass through genuine technical feature updates
+Batched LLM classification: multiple articles per completion (fewer API calls).
+Falls back to per-article calls if JSON parse fails.
 """
 
 import logging
-from typing import Dict, Any, List
+from typing import Any, Dict, List, Tuple
 
 from graph.state import GraphState
 from llm.nvidia_client import invoke_llm
+from nodes.llm_article_batches import chunk_list, parse_json_array
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +36,7 @@ async def content_filter_node(state: GraphState) -> Dict[str, Any]:
         text_snippet = article.get("article_text", "")[:600]
         url = article.get("url", "")
 
-        prompt = f"""You are an enterprise content classifier for a Market Intelligence system.
+    prompt = f"""You are an enterprise content classifier for a Market Intelligence system.
 
 Classify this article's primary intent:
 
@@ -64,13 +61,13 @@ Content excerpt:
 
 Respond with ONLY one word: ACCEPT or REJECT"""
 
-        messages = [
-            {
-                "role": "system",
-                "content": "You are a strict binary classifier. Respond with exactly one word.",
-            },
-            {"role": "user", "content": prompt},
-        ]
+    messages = [
+        {
+            "role": "system",
+            "content": "You are a strict binary classifier. Respond with exactly one word.",
+        },
+        {"role": "user", "content": prompt},
+    ]
 
         try:
             response = await invoke_llm(messages, temperature=0.0, max_tokens=10)
@@ -90,9 +87,5 @@ Respond with ONLY one word: ACCEPT or REJECT"""
             )
             validated.append(article)
 
-    logger.info(
-        "CONTENT FILTER — %d/%d articles passed",
-        len(validated), len(articles),
-    )
-
+    logger.info("CONTENT FILTER — %d/%d articles passed", len(validated), len(articles))
     return {"filtered_results": validated}

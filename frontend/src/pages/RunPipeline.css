@@ -2,23 +2,34 @@
    INTELLIGENCE PAGE — Phase 2: Interactive Intelligence System
    ═══════════════════════════════════════════════════════════════════ */
 
-/* ── Page Layout: Default (full-width) vs Sidebar mode ─────────── */
+/* ── Pipeline notice (early exit / no signals) ─────────────────── */
 
-.intelligence-page {
-    display: block;
+.pipeline-notice-card {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    border-left: 4px solid var(--warning);
+    background: var(--warning-bg);
 }
 
-.intelligence-page.with-sidebar {
-    display: grid;
-    grid-template-columns: 1fr 360px;
-    align-items: start;
-    gap: 24px;
-    /* The sidebar column is reserved but sidebar itself is fixed-positioned */
+.pipeline-notice-card .notice-icon {
+    font-size: 1.5rem;
+    color: var(--warning);
+    flex-shrink: 0;
 }
 
-/* The main content column */
-.intel-main-col {
-    min-width: 0;
+.pipeline-notice-card h3 {
+    font-size: 1rem;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.pipeline-notice-card p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.5;
 }
 
 /* ── Input Section ─────────────────────────────────────────────── */
@@ -265,6 +276,24 @@
     transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.pipeline-anim-sub {
+    font-size: 0.7rem;
+    color: var(--text-faint);
+    margin-top: 2px;
+    font-style: italic;
+}
+
+.flow-latency {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    color: var(--success);
+    font-weight: 700;
+    background: rgba(16, 185, 129, 0.08);
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-right: 4px;
+}
+
 
 /* ═══════════════════════════════════════════════════════════════════
    ERROR
@@ -318,6 +347,15 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 20px;
+}
+
+.result-header-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    flex-shrink: 0;
+    min-width: min(200px, 100%);
 }
 
 .result-header-card h2 {
@@ -727,7 +765,8 @@
 }
 
 .signal-expanded {
-    padding: 0 20px 20px 60px;
+    padding: 0 24px 20px 60px;
+    /* aligned with title (28px rank + 12px gap + 20px padding) */
     animation: fadeInUp 0.25s ease;
 }
 
@@ -736,7 +775,6 @@
     line-height: 1.65;
     color: var(--text-muted);
     margin-bottom: 14px;
-    max-width: 700px;
 }
 
 .signal-impact {
@@ -1305,12 +1343,106 @@
         padding-left: 20px;
     }
 
-    .rag-sidebar {
-        position: static !important;
-        width: 100% !important;
-        right: auto !important;
-        top: auto !important;
-        height: 420px;
-        max-height: 420px;
+    .result-header-row {
+        flex-direction: column;
+    }
+
+    .result-header-actions {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .result-header-actions .btn-pdf,
+    .result-header-actions .btn-report-assistant-jump {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .result-header-card {
+        padding: 20px;
+    }
+
+    .pipeline-anim-header {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .pipeline-anim-timer {
+        align-items: flex-start;
+    }
+
+    .executive-card,
+    .distribution-card {
+        padding: 20px;
+    }
+
+    .dist-cat {
+        min-width: 70px;
+        font-size: 0.6rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .intel-input-section {
+        padding: 18px;
+    }
+
+    .intel-input {
+        height: 48px;
+        font-size: 0.9rem;
+    }
+
+    .intel-run-btn,
+    .intel-stop-btn {
+        height: 48px;
+        padding: 0 20px;
+    }
+
+    .pipeline-anim-card {
+        padding: 18px;
+    }
+
+    .timer-value {
+        font-size: 1.2rem;
+    }
+
+    .flow-node {
+        width: 26px;
+        height: 26px;
+        font-size: 0.6rem;
+    }
+
+    .flow-connector {
+        width: 10px;
+    }
+
+    .flow-label {
+        font-size: 0.55rem;
+    }
+
+    .result-header-card h2 {
+        font-size: 1.3rem;
+    }
+
+    .signal-header {
+        padding: 12px 14px;
+        gap: 8px;
+    }
+
+    .signal-expanded {
+        padding: 0 14px 16px 14px;
+    }
+
+    .exec-stat-value {
+        font-size: 1.2rem;
+    }
+
+    .evidence-toggle {
+        padding: 14px 16px;
+        font-size: 0.875rem;
+    }
+
+    .evidence-list {
+        padding: 0 16px 16px;
     }
 }

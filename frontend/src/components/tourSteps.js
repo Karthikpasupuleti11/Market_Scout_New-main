@@ -49,6 +49,7 @@ export const TOUR_STEPS = [
     position: 'bottom',
   },
 
+
   // ── 6. AUTOMATION ───────────────────────────────────────────────
   {
     page: '/schedule',

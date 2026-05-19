@@ -201,10 +201,27 @@ function computeLayout(targetRect, position) {
   if (!targetRect) return fallback;
 
   const pad = 18;
-  const tw = 380;  // tooltip width
-  const th = 260;  // tooltip approx height
   const vw = window.innerWidth;
   const vh = window.innerHeight;
+  const isMobile = vw <= 768;
+
+  // On mobile, force tooltip to be centered horizontally at the bottom of target
+  if (isMobile) {
+    const mobileMargin = 12;
+    const tooltipWidth = vw - mobileMargin * 2;
+    let ttop = targetRect.top + targetRect.height + pad;
+    // If tooltip would go below the visible area, place it above
+    if (ttop + 240 > vh) {
+      ttop = Math.max(mobileMargin, targetRect.top - 260 - pad);
+    }
+    return {
+      tooltip: { top: ttop, left: mobileMargin, width: tooltipWidth },
+      arrow: { display: 'none' },
+    };
+  }
+
+  const tw = 380;  // tooltip width
+  const th = 260;  // tooltip approx height
 
   // Target center
   const tcx = targetRect.left + targetRect.width / 2;

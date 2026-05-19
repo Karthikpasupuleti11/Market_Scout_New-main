@@ -15,17 +15,20 @@ import {
     HiOutlineChatAlt2,
     HiOutlinePaperAirplane,
     HiOutlineSparkles,
+    HiOutlineChatAlt2,
 } from 'react-icons/hi';
 import { generateReportPDF } from '../utils/pdfExport';
+import ReportAssistant from '../components/ReportAssistant';
+import { formatDateTime } from '../utils/formatDate';
 import './RunPipeline.css';
 import { askRagQuestion } from '../api';
 
 const SUGGESTIONS = ['Google', 'OpenAI', 'Microsoft', 'Anthropic', 'Meta AI', 'Tesla'];
 
 const PIPELINE_STAGES = [
-    'Guardrails', 'Planning', 'Searching', 'Scraping',
-    'Validating', 'Filtering', 'Authority', 'Extracting',
-    'Verifying', 'Scoring', 'Synthesizing'
+    'Guardrails', 'Search Agent', 'Scraper Agent', 'Date Validation',
+    'Content Filter', 'Authority Check', 'Feature Extraction',
+    'Verification', 'Scoring', 'Synthesis'
 ];
 
 /* ── Insight tag logic ─────────────────────────────────────────── */
@@ -81,6 +84,8 @@ export default function RunPipeline() {
         result,
         error,
         activeStage,
+        completedStages,
+        stageLatencies,
         elapsed,
         executePipeline,
         stopPipeline,
@@ -93,16 +98,11 @@ export default function RunPipeline() {
     const [filterConfidence, setFilterConfidence] = useState('all');
     const [sortBy, setSortBy] = useState('confidence');
     const [expandedSignals, setExpandedSignals] = useState(new Set());
+    const [assistantAutoOpen, setAssistantAutoOpen] = useState(false);
 
-    // RAG / sidebar state
-    const [ragMessages, setRagMessages] = useState([]);   // [{ role: 'user'|'ai', text, sources? }]
-    const [ragQuestion, setRagQuestion] = useState('');
-    const [ragLoading, setRagLoading] = useState(false);
-    const [sidebarOpen, setSidebarOpen] = useState(true);
-    const ragInputRef = useRef(null);
-    const ragScrollRef = useRef(null);
-
+    // Prevent duplicate auto-runs when navigated here via location.state
     const lastAutoRunCompanyRef = useRef('');
+    const reportAssistantRef = useRef(null);
 
     const toggleSignal = useCallback((idx) => {
         setExpandedSignals(prev => {
@@ -114,13 +114,9 @@ export default function RunPipeline() {
     }, []);
 
     const report = result?.report || result;
-
-    // Auto-scroll RAG messages
-    useEffect(() => {
-        if (ragScrollRef.current) {
-            ragScrollRef.current.scrollTop = ragScrollRef.current.scrollHeight;
-        }
-    }, [ragMessages, ragLoading]);
+    const fromCache = result?.from_cache || report?.metadata?.from_cache;
+    const pipelineNotice = report?.metadata?.error;
+    const hasSignals = (report?.features?.length ?? 0) > 0;
 
     const handleDownloadPDF = async () => {
         if (!report) return;
@@ -132,6 +128,14 @@ export default function RunPipeline() {
             setPdfLoading(false);
         }
     };
+
+    const scrollToReportAssistant = useCallback(() => {
+        setAssistantAutoOpen(true);
+        reportAssistantRef.current?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+        });
+    }, []);
 
     const handleRun = async (e) => {
         e.preventDefault();
@@ -329,14 +333,16 @@ export default function RunPipeline() {
                     </div>
                 </form>
 
-                {/* ── Pipeline Animation ──────────────────────────── */}
-                {loading && (
-                    <PipelineAnimation
-                        company={company}
-                        activeStage={activeStage}
-                        elapsed={elapsed}
-                    />
-                )}
+            {/* ── Pipeline Animation (reads from context — survives tab switch) ── */}
+            {loading && (
+                <PipelineAnimation
+                    company={company}
+                    activeStage={activeStage}
+                    completedStages={completedStages}
+                    stageLatencies={stageLatencies}
+                    elapsed={elapsed}
+                />
+            )}
 
                 {/* ── Error ──────────────────────────────────────── */}
                 {error && (
@@ -349,29 +355,44 @@ export default function RunPipeline() {
                     </div>
                 )}
 
-                {/* ── Results ────────────────────────────────────── */}
-                {hasResults && (
-                    <div className="results-section fade-in-up">
+            {/* ── Results ────────────────────────────────────── */}
+            {result && report && (
+                <div className="results-section fade-in-up">
 
-                        <div className="card result-header-card">
-                            <div className="result-header-row">
-                                <div className="result-meta">
-                                    <h2>{report.company_name || company}</h2>
-                                    <div className="result-badges">
-                                        <span className="badge badge-accent">{report.total_features_verified || report.features?.length || 0} Signals</span>
-                                        <span className="badge badge-info">{report.total_sources_analysed || 0} Sources</span>
-                                        {distribution.length > 0 && <span className="badge badge-purple">{distribution.length} Themes</span>}
-                                        {report.generated_at && (
-                                            <span className="badge badge-warning">{new Date(report.generated_at).toLocaleDateString()}</span>
-                                        )}
-                                    </div>
+                    {!hasSignals && (pipelineNotice || report.executive_summary) && (
+                        <div className="card pipeline-notice-card fade-in">
+                            <HiOutlineExclamationCircle className="notice-icon" />
+                            <div>
+                                <h3>No verified signals in this window</h3>
+                                <p>{report.executive_summary}</p>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="card result-header-card">
+                        <div className="result-header-row">
+                            <div className="result-meta">
+                                <h2>{report.company_name || company}</h2>
+                                <div className="result-badges">
+                                    {fromCache && (
+                                        <span className="badge badge-success">Cached</span>
+                                    )}
+                                    <span className="badge badge-accent">{report.total_features_verified || report.features?.length || 0} Signals</span>
+                                    <span className="badge badge-info">{report.total_sources_analysed || 0} Sources</span>
+                                    {distribution.length > 0 && <span className="badge badge-purple">{distribution.length} Themes</span>}
+                                    {report.generated_at && (
+                                        <span className="badge badge-warning">{formatDateTime(report.generated_at)}</span>
+                                    )}
                                 </div>
+                            </div>
+                            <div className="result-header-actions">
                                 <button
                                     className="btn btn-pdf"
                                     onClick={handleDownloadPDF}
                                     disabled={pdfLoading || loading}
                                     title="Download report as PDF"
                                     id="download-pdf-btn"
+                                    type="button"
                                 >
                                     {pdfLoading ? (
                                         <><span className="spinner spinner-sm" /> Generating…</>
@@ -379,8 +400,18 @@ export default function RunPipeline() {
                                         <><HiOutlineDownload /> Download PDF</>
                                     )}
                                 </button>
+                                <button
+                                    className="btn btn-report-assistant-jump"
+                                    type="button"
+                                    onClick={scrollToReportAssistant}
+                                    title="Jump to Report Assistant chat below"
+                                >
+                                    <HiOutlineChatAlt2 />
+                                    Report Assistant
+                                </button>
                             </div>
                         </div>
+                    </div>
 
                         {(report.executive_summary || distribution.length > 0) && (
                             <div className="insight-grid fade-in-up">
@@ -528,152 +559,46 @@ export default function RunPipeline() {
                             </div>
                         )}
 
-                        {report.all_sources && report.all_sources.length > 0 && (
-                            <div className="card evidence-section fade-in-up">
-                                <button
-                                    className="evidence-toggle"
-                                    onClick={() => setSourcesExpanded(!sourcesExpanded)}
-                                >
-                                    <span>
-                                        Evidence Layer
-                                        <span className="evidence-count">{report.all_sources.length} sources</span>
-                                    </span>
-                                    {sourcesExpanded ? <HiOutlineChevronUp /> : <HiOutlineChevronDown />}
-                                </button>
-                                {sourcesExpanded && (
-                                    <div className="evidence-list fade-in">
-                                        {report.all_sources.map((url, i) => (
-                                            <a
-                                                key={i}
-                                                href={url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="evidence-item"
-                                            >
-                                                <HiOutlineExternalLink className="evidence-link-icon" />
-                                                <span>{url.length > 90 ? url.slice(0, 90) + '...' : url}</span>
-                                            </a>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                    </div>
-                )}
-            </div>
-
-            {/* ══════════════════════════════════════════════════════
-                STICKY AI SIDEBAR — only rendered when results exist
-            ══════════════════════════════════════════════════════ */}
-            {hasResults && (
-                <aside className={`rag-sidebar ${sidebarOpen ? 'open' : 'collapsed'}`}>
-
-                    {/* Sidebar Header */}
-                    <div className="rag-sidebar-header">
-                        <div className="rag-sidebar-title">
-                            <HiOutlineSparkles className="rag-sparkle-icon" />
-                            <span>Ask AI</span>
-                            <span className="rag-sidebar-company">{report.company_name || company}</span>
+                    {report.all_sources && report.all_sources.length > 0 && (
+                        <div className="card evidence-section fade-in-up">
+                            <button
+                                className="evidence-toggle"
+                                onClick={() => setSourcesExpanded(!sourcesExpanded)}
+                            >
+                                <span>
+                                    Evidence Layer
+                                    <span className="evidence-count">{report.all_sources.length} sources</span>
+                                </span>
+                                {sourcesExpanded ? <HiOutlineChevronUp /> : <HiOutlineChevronDown />}
+                            </button>
+                            {sourcesExpanded && (
+                                <div className="evidence-list fade-in">
+                                    {report.all_sources.map((url, i) => (
+                                        <a
+                                            key={i}
+                                            href={url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="evidence-item"
+                                        >
+                                            <HiOutlineExternalLink className="evidence-link-icon" />
+                                            <span>{url.length > 90 ? url.slice(0, 90) + '...' : url}</span>
+                                        </a>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                        <button
-                            className="rag-collapse-btn"
-                            onClick={() => setSidebarOpen(v => !v)}
-                            title={sidebarOpen ? 'Collapse' : 'Expand'}
-                        >
-                            {sidebarOpen ? <HiOutlineChevronDown /> : <HiOutlineChatAlt2 />}
-                        </button>
-                    </div>
-
-                    {sidebarOpen && (
-                        <>
-                            {/* Messages area */}
-                            <div className="rag-messages" ref={ragScrollRef}>
-                                {ragMessages.length === 0 ? (
-                                    <div className="rag-empty-state">
-                                        <div className="rag-empty-icon">
-                                            <HiOutlineChatAlt2 />
-                                        </div>
-                                        <p className="rag-empty-title">Ask anything about this report</p>
-                                        <p className="rag-empty-sub">I have full context of all signals, sources and insights.</p>
-                                        <div className="rag-starter-questions">
-                                            {STARTER_QUESTIONS.map((q, i) => (
-                                                <button
-                                                    key={i}
-                                                    className="rag-starter-chip"
-                                                    onClick={() => {
-                                                        setRagQuestion(q);
-                                                        ragInputRef.current?.focus();
-                                                    }}
-                                                >
-                                                    {q}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    ragMessages.map((msg, i) => (
-                                        <div key={i} className={`rag-msg rag-msg-${msg.role}`}>
-                                            {msg.role === 'ai' && (
-                                                <div className="rag-msg-avatar">
-                                                    <HiOutlineSparkles />
-                                                </div>
-                                            )}
-                                            <div className="rag-msg-bubble">
-                                                <p>{msg.text}</p>
-                                                {msg.sources?.length > 0 && (
-                                                    <div className="rag-msg-sources">
-                                                        <span className="rag-sources-label">Sources</span>
-                                                        {msg.sources.map((s, j) => (
-                                                            <div key={j} className="rag-source-chip">
-                                                                {s.text?.slice(0, 180)}…
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-
-                                {ragLoading && (
-                                    <div className="rag-msg rag-msg-ai">
-                                        <div className="rag-msg-avatar">
-                                            <HiOutlineSparkles />
-                                        </div>
-                                        <div className="rag-msg-bubble rag-thinking">
-                                            <span className="rag-dot" />
-                                            <span className="rag-dot" />
-                                            <span className="rag-dot" />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Input row */}
-                            <div className="rag-input-area">
-                                <input
-                                    ref={ragInputRef}
-                                    type="text"
-                                    className="input rag-sidebar-input"
-                                    placeholder="Ask about signals, trends, risks…"
-                                    value={ragQuestion}
-                                    onChange={e => setRagQuestion(e.target.value)}
-                                    onKeyDown={handleRagKeyDown}
-                                    disabled={ragLoading}
-                                />
-                                <button
-                                    className="rag-send-btn"
-                                    onClick={handleAskReport}
-                                    disabled={ragLoading || !ragQuestion.trim()}
-                                    title="Send"
-                                >
-                                    <HiOutlinePaperAirplane />
-                                </button>
-                            </div>
-                        </>
                     )}
-                </aside>
+
+                    {/* ── Report Assistant (inline RAG chat) ─────── */}
+                    <div
+                        id="report-assistant-section"
+                        ref={reportAssistantRef}
+                        className="report-assistant-anchor"
+                    >
+                        <ReportAssistant report={report} companyName={company} autoOpen={assistantAutoOpen} />
+                    </div>
+                </div>
             )}
         </div>
     );
@@ -761,15 +686,16 @@ function SignalCard({ signal: f, index, isExpanded, onToggle, onAsk }) {
     );
 }
 
-/* ── Pipeline Animation ─────────────────────────────────────────── */
-function PipelineAnimation({ company, activeStage, elapsed }) {
+/* ── Pipeline Animation — driven by Celery task progress polling ── */
+function PipelineAnimation({ company, activeStage, completedStages, stageLatencies, elapsed }) {
     const formatTime = (s) => {
         const m = Math.floor(s / 60);
         const sec = s % 60;
         return `${m}:${sec.toString().padStart(2, '0')}`;
     };
 
-    const progress = ((activeStage + 1) / PIPELINE_STAGES.length) * 100;
+    const doneCount = completedStages?.size || 0;
+    const progress = (doneCount / PIPELINE_STAGES.length) * 100;
 
     return (
         <div className="card pipeline-anim-card fade-in">
@@ -777,8 +703,15 @@ function PipelineAnimation({ company, activeStage, elapsed }) {
                 <div>
                     <h3>Analyzing <strong>{company}</strong></h3>
                     <p className="pipeline-anim-stage">
-                        Stage {activeStage + 1} of {PIPELINE_STAGES.length} — <span className="pipeline-active-name">{PIPELINE_STAGES[activeStage]}</span>
+                        {activeStage >= 0 && activeStage < PIPELINE_STAGES.length ? (
+                            <>Stage {activeStage + 1} of {PIPELINE_STAGES.length} — <span className="pipeline-active-name">{PIPELINE_STAGES[activeStage]}</span></>
+                        ) : activeStage >= PIPELINE_STAGES.length ? (
+                            <span className="pipeline-active-name">Complete ✓</span>
+                        ) : (
+                            <span>Initializing pipeline…</span>
+                        )}
                     </p>
+                    <p className="pipeline-anim-sub">Real-time progress from backend</p>
                 </div>
                 <div className="pipeline-anim-timer">
                     <span className="timer-value">{formatTime(elapsed)}</span>
@@ -788,11 +721,15 @@ function PipelineAnimation({ company, activeStage, elapsed }) {
 
             <div className="pipeline-flow">
                 {PIPELINE_STAGES.map((stage, i) => {
-                    const state = i < activeStage ? 'done' : i === activeStage ? 'active' : 'pending';
+                    const isDone = completedStages?.has(i);
+                    const isActive = i === activeStage;
+                    const state = isDone ? 'done' : isActive ? 'active' : 'pending';
+                    const latency = stageLatencies?.[i];
+
                     return (
                         <div key={i} className="pipeline-flow-item">
                             <div className={`flow-node ${state}`}>
-                                {state === 'done' ? (
+                                {isDone ? (
                                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                                         <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                     </svg>
@@ -801,8 +738,11 @@ function PipelineAnimation({ company, activeStage, elapsed }) {
                                 )}
                             </div>
                             <span className={`flow-label ${state}`}>{stage}</span>
+                            {isDone && latency != null && (
+                                <span className="flow-latency">{latency.toFixed(1)}s</span>
+                            )}
                             {i < PIPELINE_STAGES.length - 1 && (
-                                <div className={`flow-connector ${i < activeStage ? 'done' : ''}`} />
+                                <div className={`flow-connector ${isDone ? 'done' : ''}`} />
                             )}
                         </div>
                     );

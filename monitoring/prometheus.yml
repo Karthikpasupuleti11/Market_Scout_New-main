@@ -4,18 +4,17 @@ global:
 
 scrape_configs:
   - job_name: "market-scout"
-    metrics_path: "/metrics"
+    metrics_path: "/metrics/"
     static_configs:
-      - targets: ["host.docker.internal:8000"]
+      - targets: ["app:8000"]
         labels:
           service: "market-intelligence-scout"
-          environment: "production"
+          environment: "development"
 
-  - job_name: "market-scout-worker"
+  - job_name: "flower"
     metrics_path: "/metrics"
     static_configs:
-      - targets: ["celery_worker:9100"]
+      - targets: ["flower:5555"]
         labels:
-          service: "market-intelligence-scout"
-          component: "celery_worker"
-          environment: "production"
+          service: "celery-flower"
+          environment: "development"

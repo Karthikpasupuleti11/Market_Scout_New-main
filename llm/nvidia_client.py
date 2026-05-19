@@ -12,6 +12,7 @@ Features:
 """
 
 import logging
+import threading
 import time
 import threading
 import asyncio
@@ -21,14 +22,42 @@ from itertools import cycle
 from typing import List, Dict, Optional
 
 from openai import OpenAI
+
 from app.config import settings
 from observability.metrics import (
     LLM_CALL_COUNT,
     LLM_LATENCY,
     LLM_TOKEN_USAGE,
 )
+from cache.redis_client import make_cache_key, get_cache, set_cache
+from observability.metrics import LLM_CALL_COUNT, LLM_LATENCY, LLM_TOKEN_USAGE
 
 logger = logging.getLogger(__name__)
+
+
+# ────────────────────────────────────────────────────────────────────
+# Token Bucket — per key, sliding 60s window
+# ────────────────────────────────────────────────────────────────────
+
+class TokenBucket:
+    def __init__(self, rpm: int):
+        self.rpm = rpm
+        self.window = 60.0
+        self.calls: deque = deque()
+        self.cond = threading.Condition(threading.Lock())
+
+    def acquire(self) -> None:
+        with self.cond:
+            while True:
+                now = time.monotonic()
+                while self.calls and now - self.calls[0] > self.window:
+                    self.calls.popleft()
+                if len(self.calls) < self.rpm:
+                    self.calls.append(now)
+                    return
+                wait = self.window - (now - self.calls[0]) + 0.01
+                self.cond.wait(timeout=max(0.05, wait))
+
 
 # ─────────────────────────────────────────────────────────────
 # CONFIGURATION
@@ -196,6 +225,18 @@ async def invoke_llm(
 
     agent_name = _infer_agent_name(messages)
 
+    # ── Prompt-level cache (deterministic calls only) ─────────────
+    cache_key: Optional[str] = None
+    if temperature == 0:
+        cache_key = _prompt_cache_key(messages, temperature, max_tokens)
+        cached = get_cache(cache_key)
+        if cached is not None:
+            LLM_CALL_COUNT.labels(agent_name=agent_name, status="cache_hit").inc()
+            logger.debug("LLM CACHE HIT agent=%s", agent_name)
+            return cached
+
+    last_error: Optional[Exception] = None
+
     for attempt in range(1, retries + 1):
 
         api_key = _get_next_available_key()
@@ -355,5 +396,3 @@ async def invoke_llm_with_tools(
 
             top_p=settings.LLM_TOP_P,
         )
-
-    return response

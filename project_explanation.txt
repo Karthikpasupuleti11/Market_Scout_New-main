@@ -1,30 +1,32 @@
 ================================================================================
-        MARKET SCOUT AGENT — COMPLETE PROJECT EXPLANATION
+        MARKET INTELLIGENCE SCOUT — COMPLETE PROJECT EXPLANATION
 ================================================================================
 
-This document explains EVERYTHING in the Market Scout Agent project —
-every file, every module, every technology, and how they all connect together.
+This document explains the entire Market Scout platform — its architecture,
+every module, every technology, and how they connect together.
 
 
 ================================================================================
 1. WHAT IS THIS PROJECT?
 ================================================================================
 
-Market Scout Agent is an AI-powered competitive intelligence system.
-You give it a company name (e.g. "OpenAI"), and it:
+Market Intelligence Scout is an AI-powered competitive intelligence system.
 
-  1. Generates smart search queries using an LLM
-  2. Searches the web using the Tavily search API
-  3. Scrapes the top articles using 3 different scraping strategies (BeautifulSoup, Newspaper3k, Playwright)
-  4. Filters out anything older than 7 days
-  5. Removes non-technical content
-  6. Scores each source's authority/credibility
-  7. Extracts technical features using an LLM
-  8. Cross-verifies features across multiple sources using SBERT embeddings, and groups the similar features
-  9. Calculates confidence scores for each feature
-  10. Generates an executive intelligence report with citations
+Given a company name (e.g. "OpenAI"), it:
 
-The result is a structured briefing document with verified technical features,
+  1.  Validates input via security guardrails (OWASP-compliant)
+  2.  Generates smart search queries using an LLM
+  3.  Searches the web via the Tavily API
+  4.  Scrapes top articles using 3 strategies (BeautifulSoup, Newspaper3k, Playwright)
+  5.  Filters out anything older than 7 days
+  6.  Removes non-technical content
+  7.  Scores each source's authority and credibility
+  8.  Extracts structured technical features via LLM
+  9.  Cross-verifies features across sources using SBERT embeddings
+  10. Calculates confidence scores for each feature
+  11. Generates an executive intelligence report with citations
+
+The output is a structured briefing with verified technical features,
 confidence scores, source citations, and an executive summary.
 
 
@@ -33,853 +35,623 @@ confidence scores, source citations, and an executive summary.
 ================================================================================
 
 BACKEND:
-  • Python 3.10+           — Core language
-  • FastAPI                 — REST API framework (async, auto-docs at /docs)
-  • LangGraph              — Agentic pipeline orchestrator (graph-based workflow)
-  • NVIDIA NIM (meta/llama-3.3-70b-instruct) — LLM engine via OpenAI-compatible API
-  • Tavily API              — Web search engine for finding latest articles
-  • Sentence-BERT (SBERT)  — Semantic similarity for cross-source verification
-  • PostgreSQL 15           — Relational database for persistent storage
-  • SQLAlchemy              — ORM for database operations
-  • Redis 7                 — In-memory cache + rate limiting
-  • Pydantic                — Request/response validation and settings
+  • Python 3.10+            — Core language
+  • FastAPI                  — Async REST API framework (auto-docs at /docs)
+  • LangGraph               — Agentic pipeline orchestrator (graph-based workflow)
+  • Celery + Redis           — Async task queue for pipeline execution
+  • Flower                   — Real-time Celery task monitoring dashboard
+  • NVIDIA NIM               — LLM engine (meta/llama-3.3-70b-instruct)
+  • Tavily API               — Web search engine for latest articles
+  • Sentence-BERT (SBERT)   — Semantic similarity for cross-source verification
+  • PostgreSQL 15            — Relational database for persistent storage
+  • SQLAlchemy               — ORM for database operations
+  • Redis 7                  — Cache (db0), Celery broker (db1), results (db2)
+  • Pydantic                 — Request/response validation and settings
 
 OBSERVABILITY:
-  • Prometheus              — Metrics collection (14 custom metrics)
-  • Grafana                 — Dashboard visualization (16 panels, 4 sections)
-  • OpenTelemetry           — Distributed tracing
+  • Prometheus               — Metrics collection (14 custom metrics)
+  • Grafana                  — Dashboard visualization (16 panels, 4 sections)
+  • OpenTelemetry            — Distributed tracing
 
 FRONTEND:
-  • React 19 + Vite         — SPA frontend framework
-  • React Router            — Client-side page routing
-  • React Icons             — Icon library
+  • React 19 + Vite          — SPA frontend framework
+  • React Router             — Client-side routing (8 pages)
+  • React Icons              — Icon library
+  • Vanilla CSS              — Custom design system (no Tailwind)
 
 INFRASTRUCTURE:
-  • Docker + Docker Compose — Container orchestration (5 services)
-  • Dockerfile              — Multi-stage Python container
+  • Docker + Docker Compose  — 7-service container orchestration
+  • GitHub Actions           — CI/CD pipeline
 
-DEPOLYMENT:
-  • Backend                - Azure Cloud
-  • Frontend               - Vercel / Azure
+DEPLOYMENT:
+  • Backend                  — Azure VM (Docker container)
+  • Frontend                 — Azure Static Web Apps
 
 
 ================================================================================
-3. PROJECT STRUCTURE (FILE BY FILE)
+3. PROJECT STRUCTURE
 ================================================================================
 
 Market_Scout/
-├── architecture_overview.md
-├── docker-compose.yaml
-├── Dockerfile
-├── notes.txt
-├── project_explanation.txt
-├── README.md
-├── requirements.txt
-|
-├── agents
-│   ├── __init__.py
-│   ├── scraper_agent
-│   │   ├── __init__.py
-│   │   ├── agent.py
-│   │   ├── critic.py
-│   │   ├── memory.py
-│   │   ├── planner.py
-│   │   └── tools
-│   │       ├── __init__.py
-│   │       ├── bs4.py
-│   │       ├── cleaners.py
-│   │       ├── dates.py
-│   │       ├── newspaper.py
-│   │       └── playwright.py
-|   |
-│   └── search_agent
-│       ├── __init__.py
-│       ├── agent.py
-│       ├── critic.py
-│       ├── executor.py
-│       ├── memory.py
-│       └── planner.py
-|
-├── app
-│   ├── __init__.py
-│   ├── config.py
-│   └── main.py
-├── cache
-│   ├── __init__.py
-│   └── redis_client.py
-|
-├── database
-│   ├── __init__.py
-│   ├── crud.py
-│   ├── models.py
-│   ├── schemas.py
-│   └── session.py
-|
-├── frontend
-│   ├── eslint.config.js
-│   ├── index.html
-│   ├── package.json
-│   ├── postcss.config.js
-│   ├── tailwind.config.js
-│   ├── README.md
-│   ├── vite.config.js
-│   ├── public
-│   └── src
-│       ├── api.js
-│       ├── App.jsx
-│       ├── index.css
-│       ├── main.jsx
-│       ├── components
-│       │   ├── Header.jsx
-│       │   └── Sidebar.jsx
-│       └── pages
-│           ├── Competitors.jsx
-│           ├── Dashboard.jsx
-│           ├── Reports.jsx
-│           ├── RunPipeline.jsx
-│           └── ThemeToggle.jsx
-├── graph
-│   ├── __init__.py
-│   ├── builder.py
-│   └── state.py
-├── llm
-│   ├── __init__.py
-│   └── nvidia_client.py
-├── monitoring
-│   ├── prometheus.yml
-│   └── grafana
-│       ├── dashboards
-│       │   └── market_scout.json
-│       └── provisioning
-│           ├── dashboards
-│           │   └── dashboard.yml
-│           └── datasources
-│               └── datasource.yml
-├── nodes
-│   ├── __init__.py
-│   ├── authority_check.py
-│   ├── content_filter.py
-│   ├── date_validation.py
-│   ├── feature_extraction.py
-│   ├── guardrails.py
-│   ├── scoring.py
-│   ├── synthesis.py
-│   └── verification.py
-|
-└── observability
-    ├── __init__.py
-    ├── metrics.py
-    └── tracing.py
+├── app/                        # FastAPI application
+│   ├── config.py               #   Pydantic settings (reads .env)
+│   └── main.py                 #   API endpoints + middleware
+│
+├── agents/                     # Autonomous AI agents
+│   ├── scraper_agent/          #   Multi-tool web scraper
+│   │   ├── agent.py            #     Orchestrator (parallel URL processing)
+│   │   ├── planner.py          #     LLM-based strategy selector
+│   │   ├── critic.py           #     Technical content validator
+│   │   ├── memory.py           #     Redis-based scrape cache
+│   │   └── tools/              #     Scraping implementations
+│   │       ├── bs4.py          #       BeautifulSoup (static pages)
+│   │       ├── newspaper.py    #       Newspaper3k (news articles)
+│   │       ├── playwright.py   #       Playwright (dynamic JS sites)
+│   │       ├── cleaners.py     #       HTML/text cleaning utilities
+│   │       └── dates.py        #       Date parsing utilities
+│   │
+│   └── search_agent/           #   LLM-driven search agent
+│       ├── agent.py            #     Orchestrator (iterative search loop)
+│       ├── planner.py          #     LLM query generation
+│       ├── executor.py         #     Tavily search execution
+│       ├── critic.py           #     Result quality evaluation
+│       └── memory.py           #     Redis-based search memory
+│
+├── nodes/                      # Deterministic pipeline nodes
+│   ├── guardrails.py           #   Input validation + rate limiting
+│   ├── date_validation.py      #   Recency filter (≤7 days)
+│   ├── content_filter.py       #   Technical relevance filter
+│   ├── authority_check.py      #   Source credibility scoring
+│   ├── feature_extraction.py   #   LLM structured feature extraction
+│   ├── verification.py         #   SBERT cross-source verification
+│   ├── scoring.py              #   Confidence score calculation
+│   └── synthesis.py            #   Executive report generation
+│
+├── graph/                      # LangGraph pipeline definition
+│   ├── builder.py              #   Graph construction + node wiring
+│   └── state.py                #   GraphState TypedDict schema
+│
+├── llm/                        # LLM client
+│   └── nvidia_client.py        #   NVIDIA NIM API wrapper (OpenAI SDK)
+│
+├── celery_app/                 # Async task infrastructure
+│                               #   Celery worker config + task definitions
+│
+├── scheduler/                  # Scheduled automation
+│                               #   Time-based analysis job scheduler
+│
+├── services/                   # Business logic services
+│
+├── database/                   # Data persistence layer
+│   ├── models.py               #   SQLAlchemy table definitions
+│   ├── schemas.py              #   Pydantic validation schemas
+│   ├── crud.py                 #   Create/read/update/delete operations
+│   ├── session.py              #   Database engine + session factory
+│   └── scheduled_job_model.py  #   Scheduled job table definition
+│
+├── cache/                      # Redis client
+│   └── redis_client.py         #   Caching, rate limiting, audit logs
+│
+├── observability/              # Monitoring instrumentation
+│   ├── metrics.py              #   14 Prometheus metric definitions
+│   └── tracing.py              #   OpenTelemetry tracing setup
+│
+├── monitoring/                 # Monitoring configuration
+│   ├── prometheus.yml          #   Prometheus scrape config
+│   └── grafana/                #   Grafana provisioning + dashboards
+│
+├── frontend/                   # React SPA
+│   └── src/
+│       ├── api.js              #   Backend API service layer
+│       ├── App.jsx             #   Root component + routing
+│       ├── index.css           #   Global design system
+│       ├── components/         #   Shared UI components
+│       │   ├── Sidebar.jsx     #     Navigation sidebar (hamburger on mobile)
+│       │   ├── Header.jsx      #     TopBar with branding + status
+│       │   ├── SettingsPanel.jsx    # Settings drawer
+│       │   ├── NotificationPanel.jsx # Notification dropdown
+│       │   ├── ReportAssistant.jsx  # AI report assistant
+│       │   ├── GuidedTour.jsx  #     Interactive walkthrough
+│       │   └── tourSteps.js    #     Tour step definitions
+│       │
+│       └── pages/              #   Application pages
+│           ├── Dashboard.jsx   #     Overview + KPIs + pipeline visualization
+│           ├── RunPipeline.jsx #     Intelligence analysis execution
+│           ├── Analysis.jsx    #     Multi-company comparison
+│           ├── Reports.jsx     #     Report archive + search
+│           ├── Competitors.jsx #     Company watchlist
+│           ├── Schedule.jsx    #     Automated scheduling
+│           ├── RagChat.jsx     #     AI Q&A on reports
+│           └── About.jsx       #     Platform information
+│
+├── docker-compose.yaml         # 7-service orchestration
+├── Dockerfile                  # Python container build
+├── requirements.txt            # Python dependencies
+└── .env                        # API keys (user-created)
 
 
 ================================================================================
-4. THE PIPELINE — HOW IT WORKS (STEP BY STEP)
+4. THE PIPELINE — 11-STAGE INTELLIGENCE WORKFLOW
 ================================================================================
 
-The pipeline is a LangGraph StateGraph with 8 functional nodes and 2 Autonomous AI 
-agents wrapped as LangGraph nodes so total 10 funtional nodes and 6 error-
-exit nodes. Each node reads from and writes to a shared GraphState dictionary.
+The pipeline is a LangGraph StateGraph. Each node reads from and writes to
+a shared GraphState dictionary. The pipeline runs asynchronously via Celery.
 
---- STEP 1: GUARDRAILS (nodes/guardrails.py) ---
+FLOW:  User Request → FastAPI → Celery Task → LangGraph Pipeline → Database → Response
 
-Purpose: Security firewall for input validation
-What it does:
-  • Acts as Pre-Agent Firewal
-  • Use Cyber Security principles (OWASP A03 — OWASP A05 — OWASP A10)
-  • Strips HTML tags from the company name
-  • Unescapes HTML entities (e.g. &amp; → &)
-  • Collapses whitespace
-  • Checks the name is 2-200 characters
-  • Validates against a regex: letters, numbers, spaces, dots, hyphens, ampersands
-  • Checks for blocked keywords ("hack", "exploit", "jailbreak", "system prompt", etc.)
-  • Enforces Redis-backed rate limiting (10 requests per 60 seconds)
-  • Optionally runs an LLM semantic check at temperature=0  
+────────────────────────────────────────────────────────────────────
 
-Writes to state: company_name (sanitised), error (if blocked)
-Routed by: _check_guardrail → "search_planner" or "error_exit"
+STAGE 1: GUARDRAILS                          [nodes/guardrails.py]
+────────────────────────────────────────────────────────────────────
+Purpose:  Security firewall for input validation (OWASP-compliant)
 
+  • Strips HTML tags, unescapes HTML entities, collapses whitespace
+  • Validates name length (2–200 chars) and format (regex)
+  • Blocks dangerous keywords (hack, exploit, jailbreak, etc.)
+  • Enforces Redis-backed rate limiting (10 req / 60s)
+  • Optional LLM semantic validation at temperature=0
 
---- STEP 2: SEARCH AGENT (agent/search_agent/) ---
-Purpose: Intelligent query planning + web discovery
-What it does:
-  • Acts as an Autonomous Search Agent (LLM-powered)
-  • Takes sanitised company_name as input
-  • Uses LLM to generate high-quality search queries
-  • Incorporates:
-    - Previous queries (memory)
-    - Feedback from failed attempts
-  • Calls Tavily API to perform web search
-  • Filters results:
-    - Removes duplicate URLs
-    - Skips low-value domains (YouTube, docs, support pages, etc.)
-  • Stores:
-    - Attempted queries
-    - Seen URLs
-  • Evaluates results using critic logic:
-    -  Checks if enough technical content is found
-  • Runs iterative loop (max 2 iterations):
-    - Retry with improved queries if results are weak
-  • Saves memory in Redis (TTL-based)
+  Writes → company_name (sanitised), error (if blocked)
+  Routes → "search_agent" or "error_exit"
 
-Key Components:
-  • agent.py → Main Controller and orchestrator
-  • planner.py → LLM query generation
-  • executor.py → Tavily search execution
-  • critic.py → result quality check
-  • memory.py → Redis-based memory
+────────────────────────────────────────────────────────────────────
+STAGE 2: SEARCH AGENT                    [agents/search_agent/]
+────────────────────────────────────────────────────────────────────
+Purpose:  Intelligent query planning + web discovery
 
-Technologies:
+  • LLM generates high-quality search queries
+  • Tavily API executes web search
+  • Filters: removes duplicates, skips low-value domains
+  • Iterative loop (max 2 iterations) with critic feedback
+  • Stores query memory in Redis
 
-  • LLM (NVIDIA / OpenAI-style client) (meta/llama-3.3-70b-instruct)
-  • Tavily Search API
-  • Redis (memory caching)
+  Components: agent.py (orchestrator), planner.py (LLM queries),
+              executor.py (Tavily), critic.py (quality check), memory.py
 
-  Writes to state:
-  search_results → list of URLs + snippets
+  Writes → search_results (URLs + snippets)
 
+────────────────────────────────────────────────────────────────────
+STAGE 3: SCRAPER AGENT                   [agents/scraper_agent/]
+────────────────────────────────────────────────────────────────────
+Purpose:  Extract clean article content from URLs
 
---- STEP 3: SCRAPER AGENT (agent/scraper_agent/) ---
-Purpose: Extract clean article content from URLs
-What it does:
-  • Acts as a Multi-Tool Scraping Agent (LLM + tools)
-  • Takes search_results (URLs) as input
-  • Processes URLs in parallel (ThreadPoolExecutor)
-  • For each URL:
+  For each URL (processed in parallel via ThreadPoolExecutor):
+    1. Cache check → skip if already scraped
+    2. LLM selects strategy → beautifulsoup / newspaper3k / playwright
+    3. Execute with fallback chain (max 3 failures per URL)
+    4. Clean content → extract title, text, publish date
+    5. LLM critic validates technical relevance
+    6. Cache result in Redis
 
-  Step-by-step:
-  1. Cache Check
-  • Checks Redis if article already scraped
-  • Avoids duplicate processing
+  Components: agent.py, planner.py, critic.py, memory.py
+              tools/ → bs4.py, newspaper.py, playwright.py
 
-  2. Strategy Selection (LLM)
-  • Uses LLM to decide best scraping method:
-    - beautifulsoup → static pages
-    - newspaper3k → news articles
-    - playwright → dynamic JS sites
+  Writes → scraped_articles
 
-  3. Multi-Tool Execution
-  • Tries tools in order (fallback mechanism)
-  • Stops when successful
-  • Max 3 failures per URL
+────────────────────────────────────────────────────────────────────
+STAGE 4: DATE VALIDATION                [nodes/date_validation.py]
+────────────────────────────────────────────────────────────────────
+Purpose:  Filter out stale content (>7 days old)
 
-  4. Content Cleaning
-  • Removes noise, HTML, unnecessary text
-  • Extracts:
-    - Title
-    - Article text
-    - Publish date
+  • Parses ISO-8601 dates, compares against recency window
+  • No date → conservatively discarded
+  • Audit trail stored in Redis
 
-  5. Technical Validation (LLM Critic)
-  • Uses LLM to check if content is technical
-  • Rejects:
-    - Marketing blogs
-    - News fluff
-    - Non-technical content
+  Writes → filtered_results, discarded_urls
+  Routes → "content_filter" or "all_expired"
 
-  6. Save Result
-  • Stores cleaned article in Redis
-  • Adds metadata:
-    - URL
-    - Title
-    - Text
-    - Publish date
-    - Scraper used
+────────────────────────────────────────────────────────────────────
+STAGE 5: CONTENT FILTER                  [nodes/content_filter.py]
+────────────────────────────────────────────────────────────────────
+Purpose:  Remove non-technical / irrelevant articles
 
-Key Components:
-  • agent.py → Main Controller and orchestrator
-  • planner.py → scraping strategy decision (returns order of usage tools for particular URL)
-  • tools/bs4.py → static scraping
-  • tools/newspaper.py → article extraction
-  • tools/playwright.py → dynamic scraping
-  • critic.py → technical content validation
-  • memory.py → caching
+  • Keyword density analysis (API, SDK, model, benchmark, etc.)
+  • Rejects marketing, job postings, investor relations content
 
-Technologies:
+  Writes → filtered_results (overwritten)
+  Routes → "authority_check" or "no_technical"
 
-  • BeautifulSoup
-  • Newspaper3k
-  • Playwright
-  • LLM (for decision + filtering)
-  • ThreadPoolExecutor (parallelism)
-  • Redis (cache)
+────────────────────────────────────────────────────────────────────
+STAGE 6: AUTHORITY CHECK                [nodes/authority_check.py]
+────────────────────────────────────────────────────────────────────
+Purpose:  Score and rank sources by credibility
 
-Writes to state:
-  scraped_articles → list of structured articles
-
-
---- STEP 4: DATE VALIDATION (nodes/date_validation.py) ---
-
-Purpose: Filter out stale content (>7 days old)
-What it does:
-  • Parses each article's publish_date as an ISO-8601 datetime
-  • Compares against the current time minus DATE_WINDOW_DAYS (default: 7)
-  • Articles with no date → conservatively discarded
-  • Articles older than 7 days → discarded with reason logged
-  • Creates an audit trail in Redis
-  • Increments URLS_DISCARDED Prometheus counter per reason
-
-Writes to state: filtered_results, discarded_urls
-Routed by: _check_filtered_after_date → "content_filter" or "all_expired"
-
-
---- STEP 5: CONTENT FILTER (nodes/content_filter.py) ---
-
-Purpose: Remove non-technical/irrelevant articles
-What it does:
-  • Checks each article for technical keywords (API, SDK, model, benchmark, etc.)
-  • Uses a keyword density threshold to classify relevance
-  • Removes marketing fluff, job postings, and investor relations content
-  • Overwrites filtered_results with only technical articles
-
-Writes to state: filtered_results (overwritten)
-Routed by: _check_filtered_after_content → "authority_check" or "no_technical"
-
-
---- STEP 6: AUTHORITY CHECK (nodes/authority_check.py) ---
-
-Purpose: Score and rank sources by credibility
-What it does:
-  • Assigns authority scores based on domain reputation tiers
-  • Weighs factors like: official domain, known tech publication, .edu/.gov
-  • Enriches each article's authority_score field
+  • Domain reputation tiers (official, tech publication, .edu/.gov)
+  • Enriches each article with authority_score (0.0–1.0)
   • Sorts results by authority (highest first)
 
-Writes to state: filtered_results (enriched with authority scores)
+  Writes → filtered_results (enriched with scores)
 
+────────────────────────────────────────────────────────────────────
+STAGE 7: FEATURE EXTRACTION          [nodes/feature_extraction.py]
+────────────────────────────────────────────────────────────────────
+Purpose:  Extract structured technical features via LLM
 
---- STEP 7: FEATURE EXTRACTION (nodes/feature_extraction.py) ---
+  Per article, extracts:
+    • feature_summary — detailed 2–3 sentence description
+    • category — model_release | api_update | performance | capability
+    • metrics — quantitative measurements
+    • evidence — direct quotes from the article
 
-Purpose: Extract structured technical features from article text
-What it does:
-  • Sends each article to the LLM with a prompt requesting structured JSON
-  • Expected output per article: list of features with:
-      - feature_summary (detailed 2-3 sentence description)
-      - category (model_release | api_update | performance | capability)
-      - metrics (quantitative measurements)
-      - evidence (direct quotes from the article)
-  • Cleans LLM response: strips markdown fences, extracts JSON arrays
-  • Validates extracted features against expected schema
-  • Records FEATURES_EXTRACTED Prometheus counter
+  Writes → extracted_features
+  Routes → "verification" or "no_features"
 
-Writes to state: extracted_features
-Routed by: _check_features → "verification" or "no_features"
+────────────────────────────────────────────────────────────────────
+STAGE 8: VERIFICATION                    [nodes/verification.py]
+────────────────────────────────────────────────────────────────────
+Purpose:  Cross-reference features using SBERT semantic similarity
 
+  • Loads Sentence-BERT model (all-MiniLM-L6-v2)
+  • Encodes features into 384-dim embeddings
+  • Clusters features with cosine similarity ≥ 0.85
+  • Merges clusters into verified features with source_count
 
---- STEP 8: VERIFICATION (nodes/verification.py) ---
+  Writes → verified_features
 
-Purpose: Cross-reference features across multiple sources using SBERT
-What it does:
-  • Loads the Sentence-BERT model (all-MiniLM-L6-v2)
-  • Encodes all feature summaries into 384-dimensional embeddings
-  • Computes cosine similarity between every pair
-  • Clusters features with similarity ≥ 0.85 (same feature, different source)
-  • Merges clusters into single verified features with:
-      - source_count (how many articles mentioned it)
-      - all_sources (list of URLs)
-      - source_authority (average of source scores)
-  • Records FEATURES_VERIFIED Prometheus counter
+────────────────────────────────────────────────────────────────────
+STAGE 9: CONFIDENCE SCORING                  [nodes/scoring.py]
+────────────────────────────────────────────────────────────────────
+Purpose:  Calculate final trust score for each feature
 
-Writes to state: verified_features
+  Three scoring signals (each 0.0 → 1.0):
+    a) Recency   — age-based decay (today=1.0, 7d=0.5, >14d=0.3)
+    b) Verification — source count (logarithmic, 5+=~1.0)
+    c) Authority — direct pass-through of source score
 
+  Final: confidence = 0.3×recency + 0.4×verification + 0.3×authority
 
---- STEP 9: CONFIDENCE SCORING (nodes/scoring.py) ---
+  Writes → scored_features
 
-Purpose: Calculate a final trust score for each feature
-What it does:
-  • Three scoring signals, each producing 0.0 → 1.0:
-      a) RECENCY SCORE: Based on publish date age
-         - Today → 1.0
-         - 7 days old → ~0.5
-         - >14 days → 0.3 (floor)
-         - Missing date → 0.8 (benefit of doubt)
+────────────────────────────────────────────────────────────────────
+STAGE 10: SYNTHESIS                         [nodes/synthesis.py]
+────────────────────────────────────────────────────────────────────
+Purpose:  Generate the final executive intelligence report via LLM
 
-      b) VERIFICATION SCORE: Based on number of corroborating sources
-         - 0 sources → 0.2
-         - 1 source → 0.4
-         - 2 sources → ~0.7
-         - 5+ sources → approaching 1.0 (logarithmic)
+  Produces:
+    • executive_summary — 3–5 paragraph strategic overview
+    • features — ranked list with titles, descriptions, confidence
+    • all_sources — complete URL list with citations
 
-      c) AUTHORITY SCORE: Direct pass-through of source_authority (0-1)
+  Includes deterministic fallback if LLM fails.
 
-  • Final confidence = weighted average:
-      confidence = 0.3 * recency + 0.4 * verification + 0.3 * authority
+  Writes → synthesis_report
 
-  • Each feature gets a score_breakdown dict for transparency
-  • Records CONFIDENCE_SCORE Prometheus histogram
+────────────────────────────────────────────────────────────────────
+ERROR / EARLY-EXIT NODES
+────────────────────────────────────────────────────────────────────
+5 graceful degradation paths:
 
-Writes to state: scored_features
-
-
---- STEP 10: SYNTHESIS (agents/synthesis.py) ---
-
-Purpose: Generate the final executive intelligence report
-What it does:
-  • Sends scored features to the LLM with instructions to create:
-      - executive_summary: 3-5 paragraph overview
-      - features: ranked list with titles, descriptions, confidence, citations
-      - all_sources: complete list of URLs used
-  • Features are ranked by confidence score (highest first)
-  • Includes a deterministic fallback report if LLM fails
-  • Validates the report has required keys
-  • Caches the final report in Redis
-  • Records SOURCES_ANALYSED Prometheus histogram
-
-Writes to state: synthesis_report
-
-
---- ERROR / EARLY-EXIT NODES ---
-
-The pipeline has 5 early-exit nodes for graceful degradation:
-  • no_results → "No search results found for '{company}'"
-  • no_articles → "All URLs failed to scrape"
-  • all_expired → "All articles are older than 7 days"
+  • no_results   → "No search results found for '{company}'"
+  • no_articles  → "All URLs failed to scrape"
+  • all_expired  → "All articles are older than 7 days"
   • no_technical → "No technical content found"
-  • no_features → "No extractable features found"
+  • no_features  → "No extractable features found"
 
-All early-exit nodes → error_exit → error_exit_node → END
-The error_exit_node packages the error into a synthesis_report format
-so the API always returns a consistent response shape.
+  All → error_exit → END (returns consistent response shape)
 
 
 ================================================================================
-5. THE API — FASTAPI ENDPOINTS
+5. ASYNC ARCHITECTURE — CELERY INTEGRATION
 ================================================================================
 
-All endpoints are defined in app/main.py:
+The pipeline runs asynchronously to avoid blocking the API:
 
-POST /run-agent
-  Input:  { "company_name": "OpenAI" }
-  Output: AgentResponse (executive summary, features list, sources, metadata)
-  What happens:
-    1. Receives the company name via Pydantic-validated request body
-    2. Increments ACTIVE_PIPELINES gauge
-    3. Invokes the compiled LangGraph pipeline with {"company_name": name}
-    4. Extracts the synthesis_report from the final state
-    5. Saves the report + features to PostgreSQL via CRUD operations
-    6. Decrements ACTIVE_PIPELINES gauge
-    7. Records PIPELINE_RUNS counter (completed/error)
-    8. Returns the structured AgentResponse
+  1. Frontend sends POST /run-agent {"company_name": "OpenAI"}
+  2. FastAPI enqueues a Celery task → returns task_id immediately
+  3. Celery worker picks up the task and runs the LangGraph pipeline
+  4. Frontend polls GET /task/{task_id} every 2 seconds
+  5. When complete, the result is returned with the full report
 
-GET /reports/{company_name}?limit=10
-  Returns historical pipeline reports for a company from PostgreSQL
+CELERY CONFIGURATION:
+  • Broker:  Redis db=1  (redis://redis:6379/1)
+  • Results: Redis db=2  (redis://redis:6379/2)
+  • Cache:   Redis db=0  (default)
+  • Concurrency: 2 workers, max 50 tasks per child process
+  • Monitoring: Flower dashboard at http://localhost:5555
 
-GET /features/{company_name}?limit=50
-  Returns all extracted features for a company from PostgreSQL
-
-GET /competitors
-  Returns all tracked companies from PostgreSQL
-
-POST /competitors
-  Creates a new company entry in the database
-
-GET /health
-  Returns { status: "healthy", version: "2.0.0", timestamp: "..." }
-
-GET /metrics
-  Returns Prometheus metrics in text exposition format (scraped by Prometheus)
-
-GET /docs
-  Auto-generated Swagger/OpenAPI documentation
+CONCURRENCY CONTROL:
+  • Global threading.Semaphore(3) limits concurrent Playwright instances
+  • Prevents memory exhaustion under multi-user load
 
 
 ================================================================================
-6. THE DATABASE — POSTGRESQL + SQLALCHEMY
+6. THE API — FASTAPI ENDPOINTS
 ================================================================================
 
-3 tables, defined in database/models.py:
+All endpoints defined in app/main.py:
 
-TABLE: competitors
-  ├── id           (PK, auto-increment)
-  ├── name         (unique, indexed)
-  ├── industry     (default: "technology")
-  └── created_at   (UTC timestamp)
+  POST /run-agent
+    Input:  {"company_name": "OpenAI"}
+    Output: {"task_id": "abc-123"}
+    Action: Enqueues Celery task, returns task ID for polling
 
-TABLE: reports
-  ├── id                (PK, auto-increment)
-  ├── competitor_id     (FK → competitors.id)
-  ├── executive_summary (Text)
-  ├── total_sources     (Integer)
-  ├── total_features    (Integer)
-  ├── all_sources       (JSON array of URLs)
-  ├── metadata          (JSON)
-  └── created_at        (UTC timestamp)
+  GET /task/{task_id}
+    Output: {"status": "pending|running|done|failed", "result": {...}}
+    Action: Returns current task status and result when complete
 
-TABLE: features
-  ├── id                (PK, auto-increment)
-  ├── competitor_id     (FK → competitors.id)
-  ├── report_id         (FK → reports.id)
-  ├── feature_title     (Short title, max 10 words)
-  ├── feature_text      (Detailed 2-3 sentence summary)
-  ├── description       (Full description from synthesis)
-  ├── category          (model_release | api_update | performance | capability)
-  ├── confidence_score  (Float 0.0-1.0)
-  ├── source_count      (Integer)
-  ├── source_url        (String)
-  ├── evidence          (Text — direct quotes)
-  ├── metrics           (JSON array)
-  └── created_at        (UTC timestamp)
+  GET /reports/{company_name}?limit=10
+    Returns historical intelligence reports from PostgreSQL
 
-Relationships:
-  Competitor → has many → Reports → has many → Features
+  GET /features/{company_name}?limit=50
+    Returns all extracted features for a company
 
-Files involved:
-  • database/session.py  — Creates the SQLAlchemy engine and session factory
-  • database/models.py   — Defines the 3 table classes
-  • database/schemas.py  — Pydantic schemas for CRUD input/output validation
-  • database/crud.py     — Create/read operations for all 3 tables
+  GET /competitors
+    Returns all tracked companies
 
+  POST /competitors
+    Creates a new company entry in the database
 
-================================================================================
-7. THE CACHE — REDIS
-================================================================================
+  DELETE /competitors/{id}
+    Removes a company and all associated data
 
-Defined in cache/redis_client.py. Redis is used for 4 purposes:
+  GET /scheduled-jobs
+    Returns all scheduled automation jobs
 
-1. RESULT CACHING
-   • Search queries, scraped articles, and reports are cached with a 6-hour TTL
-   • Key format: "mscout:{prefix}:{sha256_hash}"
-   • Functions: get_cache(key), set_cache(key, value, expire)
-   • CACHE_OPERATIONS Prometheus counter tracks hit/miss/error
+  POST /scheduled-jobs
+    Creates a new scheduled analysis job
 
-2. RATE LIMITING
-   • check_rate_limit(client_ip) → True if within limits
-   • 10 requests per 60-second window (configurable)
-   • Uses Redis INCR + EXPIRE for atomic counting
+  DELETE /scheduled-jobs/{id}
+    Removes a scheduled job
 
-3. AUDIT LOGGING
-   • append_audit_log(key, entry) → Appends to a Redis list
-   • Used by date_validation to record why URLs were discarded
+  POST /system/clear-storage
+    Clears all data (ScheduledJob → Feature → Report → Competitor)
 
-4. KEY GENERATION
-   • make_cache_key(prefix, data) → "mscout:{prefix}:{sha256}"
-   • Deterministic: same input always produces same key
-   • Uses SHA-256 hashing of the serialised data
+  GET /health
+    Returns {"status": "healthy", "version": "2.0.0", "timestamp": "..."}
+
+  GET /metrics
+    Prometheus metrics in text exposition format
+
+  GET /docs
+    Auto-generated Swagger/OpenAPI documentation
 
 
 ================================================================================
-8. THE LLM CLIENT — NVIDIA NIM
+7. THE DATABASE — POSTGRESQL + SQLALCHEMY
 ================================================================================
 
-Defined in llm/nvidia_client.py.
+4 tables defined across database/models.py and scheduled_job_model.py:
 
-How it works:
-  • Uses the OpenAI Python SDK (openai.OpenAI class) pointed at NVIDIA's API
+  TABLE: competitors
+    ├── id            (PK, auto-increment)
+    ├── name          (unique, indexed)
+    ├── industry      (default: "technology")
+    └── created_at    (UTC timestamp)
+
+  TABLE: reports
+    ├── id                (PK, auto-increment)
+    ├── competitor_id     (FK → competitors.id)
+    ├── executive_summary (Text)
+    ├── total_sources     (Integer)
+    ├── total_features    (Integer)
+    ├── all_sources       (JSON array of URLs)
+    ├── metadata          (JSON)
+    └── created_at        (UTC timestamp)
+
+  TABLE: features
+    ├── id                (PK, auto-increment)
+    ├── competitor_id     (FK → competitors.id)
+    ├── report_id         (FK → reports.id)
+    ├── feature_title     (Short title)
+    ├── feature_text      (2–3 sentence summary)
+    ├── description       (Full description)
+    ├── category          (model_release | api_update | performance | capability)
+    ├── confidence_score  (Float 0.0–1.0)
+    ├── source_count      (Integer)
+    ├── source_url        (String)
+    ├── evidence          (Text — direct quotes)
+    ├── metrics           (JSON array)
+    └── created_at        (UTC timestamp)
+
+  TABLE: scheduled_jobs
+    ├── id            (PK, auto-increment)
+    ├── report_id     (FK → reports.id)
+    ├── scheduled_at  (DateTime)
+    ├── status        (pending | running | done | failed)
+    ├── email         (notification email)
+    └── created_at    (UTC timestamp)
+
+  Relationships:
+    Competitor → has many → Reports → has many → Features
+    Report → has many → ScheduledJobs
+
+  Deletion order (FK-safe):
+    ScheduledJob → Feature → Report → Competitor
+
+
+================================================================================
+8. THE CACHE — REDIS (3 DATABASES)
+================================================================================
+
+  DB 0 — APPLICATION CACHE:
+    • Search queries, scraped articles, reports (6-hour TTL)
+    • Key format: "mscout:{prefix}:{sha256_hash}"
+    • Rate limiting: 10 requests per 60-second window (INCR + EXPIRE)
+    • Audit logging: append_audit_log() for date validation records
+
+  DB 1 — CELERY BROKER:
+    • Task message queue for Celery workers
+
+  DB 2 — CELERY RESULTS:
+    • Task result storage for polling
+
+
+================================================================================
+9. THE LLM CLIENT — NVIDIA NIM
+================================================================================
+
+Defined in llm/nvidia_client.py:
+
+  • Uses OpenAI Python SDK pointed at NVIDIA's API
   • Base URL: https://integrate.api.nvidia.com/v1
   • Model: meta/llama-3.3-70b-instruct
   • Parameters: temperature=0.2, top_p=0.7, max_tokens=4096
-
-Architecture:
-  • Singleton pattern: one OpenAI client reused across all requests
-  • invoke_llm(messages, max_tokens, temperature) → returns response text
-  • Built-in retry logic with exponential backoff (up to MAX_RETRIES=3)
-  • Prometheus metrics automatically recorded:
-      - LLM_CALL_COUNT: success/failure/retry per agent
-      - LLM_LATENCY: histogram of call duration
-      - LLM_TOKEN_USAGE: prompt and completion tokens per agent
-  • Agent name is inferred from the system prompt content
+  • Singleton pattern: one client reused across all requests
+  • Retry logic: exponential backoff (up to 3 retries)
+  • Thread-safe: Semaphore-gated to prevent rate limit exhaustion
+  • Prometheus metrics: call count, latency, token usage per agent
 
 
 ================================================================================
-9. OBSERVABILITY — PROMETHEUS + GRAFANA
+10. OBSERVABILITY — PROMETHEUS + GRAFANA
 ================================================================================
 
-14 Prometheus metrics defined in observability/metrics.py:
+14 Prometheus metrics in observability/metrics.py:
 
-API METRICS (recorded in main.py middleware):
-  1. api_requests_total        — Counter by endpoint, method, status
-  2. api_request_duration_secs — Histogram by endpoint
+  API:         api_requests_total, api_request_duration_secs
+  PIPELINE:    node_latency_seconds, node_executions_total,
+               pipeline_runs_total, active_pipelines
+  LLM:         llm_tokens_total, llm_calls_total, llm_call_duration_seconds
+  INTELLIGENCE: features_extracted_total, features_verified_total,
+               feature_confidence_score, sources_analysed_per_run
+  INFRA:       cache_operations_total, scraper_attempts_total,
+               urls_discarded_total
 
-PIPELINE METRICS (recorded in builder.py + main.py):
-  3. node_latency_seconds      — Histogram per node (via _instrument_node wrapper)
-  4. node_executions_total     — Counter per node, success/failure
-  5. pipeline_runs_total       — Counter: completed/error/guardrail_blocked
-  6. active_pipelines          — Gauge: currently running pipelines
+  Flow: App → /metrics → Prometheus (scrapes every 15s) → Grafana (queries)
 
-LLM METRICS (recorded in nvidia_client.py):
-  7. llm_tokens_total          — Counter by agent + token type
-  8. llm_calls_total           — Counter by agent + status
-  9. llm_call_duration_seconds — Histogram by agent
-
-INTELLIGENCE METRICS (recorded in main.py + extraction/verification):
-  10. features_extracted_total  — Counter by company + category
-  11. features_verified_total   — Counter by company
-  12. feature_confidence_score  — Histogram of score distribution
-  13. sources_analysed_per_run  — Histogram
-
-CACHE + SCRAPER METRICS (recorded in redis_client.py + scraper_strategy.py):
-  14a. cache_operations_total   — Counter: get/set × hit/miss/error
-  14b. scraper_attempts_total   — Counter: strategy × success/failure
-  14c. urls_discarded_total     — Counter: expired/no_date
-
-How metrics flow:
-  App → /metrics endpoint → Prometheus scrapes every 15s → Grafana queries
-
-Grafana Dashboard (monitoring/grafana/dashboards/market_scout.json):
-  • 16 panels in 4 collapsible rows:
-    Row 1 "Pipeline Overview": Total Runs, Success Rate, Active, Avg Time, Verified, Discarded
-    Row 2 "Pipeline Performance": Runs over time (stacked bars), Node latency (smooth lines)
-    Row 3 "LLM & Intelligence": Calls by agent, Token usage, LLM latency, Confidence distribution
-    Row 4 "Scraping & Cache": Strategy performance, Cache hit/miss, Features by category, Sources
+  Grafana Dashboard (16 panels, 4 rows):
+    Row 1: Pipeline Overview (runs, success rate, active, avg time)
+    Row 2: Pipeline Performance (runs over time, node latency)
+    Row 3: LLM & Intelligence (calls, tokens, latency, confidence)
+    Row 4: Scraping & Cache (strategy perf, cache hit/miss, features)
 
 
 ================================================================================
-10. THE FRONTEND — REACT APPLICATION
+11. THE FRONTEND — REACT APPLICATION
 ================================================================================
 
-Built with Vite + React 19, located in frontend/.
+Built with Vite + React 19. Fully responsive (mobile, tablet, desktop).
 
-DESIGN SYSTEM (src/index.css):
-  • Dark theme with carefully chosen color palette
-  • CSS custom properties for all colors, fonts, spacing, shadows
-  • Glassmorphism cards with backdrop-filter blur
-  • Animations: fadeInUp, fadeIn, shimmer, spin, slide-in-right
-  • Staggered child animations for lists
-  • Custom scrollbar styling
-  • Responsive breakpoints
+  DESIGN SYSTEM (index.css):
+    • Light theme with CSS custom properties
+    • Glassmorphism cards with backdrop-filter blur
+    • Micro-animations (fadeInUp, shimmer, slide-in)
+    • 5 breakpoints: 1440px, 1280px, 1024px, 768px, 480px
+    • Mobile: hamburger sidebar, stacked layouts
 
-LAYOUT COMPONENTS:
-  • Sidebar (src/components/Sidebar.jsx)
-    - Fixed left sidebar with navigation links
-    - 4 internal routes: Dashboard, Run Pipeline, Reports, Competitors
-    - 3 external links: API Docs, Prometheus, Grafana
-    - Brand header with logo and version badge
+  LAYOUT COMPONENTS:
+    • Sidebar         — Navigation + external links (Prometheus, Grafana, Flower)
+    • TopBar          — Branding, notification bell, settings, help button
+    • SettingsPanel   — Slide-out drawer for user preferences
+    • NotificationPanel — Dropdown notification center
+    • GuidedTour      — Interactive 7-step product walkthrough
 
-  • Header (src/components/Header.jsx)
-    - Fixed top bar with frosted glass effect
-    - Dynamic page title based on current route
-    - Backend connection status indicator
-
-PAGES:
-  • Dashboard (src/pages/Dashboard.jsx)
-    - 4 stat cards: Tracked Companies, System Status, LLM Engine, Recency Window
-    - 3 quick-action cards linking to Run Pipeline, Reports, Competitors
-    - Pipeline architecture visualisation showing all 11 nodes
-
-  • Run Pipeline (src/pages/RunPipeline.jsx)
-    - Company name input with search icon
-    - Run button with loading spinner animation
-    - Shimmer progress bar during pipeline execution
-    - Full results display: executive summary, ranked features, confidence badges,
-      category tags, source links, and all-sources list
-    - Error state display with descriptive messages
-
-  • Reports (src/pages/Reports.jsx)
-    - Search form to find reports by company name
-    - Expandable report cards showing executive summary and sources
-    - Empty state when no reports found
-
-  • Competitors (src/pages/Competitors.jsx)
-    - Grid of tracked companies with avatar, industry badge, date
-    - "Analyze" button per company to quickly run a new pipeline
-    - Empty state with prompt to run the first pipeline
-
-API SERVICE LAYER (src/api.js):
-  • runPipeline(companyName)  → POST /run-agent
-  • getReports(companyName)   → GET /reports/{name}
-  • getFeatures(companyName)  → GET /features/{name}
-  • getCompetitors()          → GET /competitors
-  • getHealth()               → GET /health
-  • All functions use fetch() with JSON parsing and error handling
-  • Backend URL: http://localhost:8000
+  PAGES (8 total):
+    • Dashboard       — KPI cards, quick actions, pipeline architecture visual
+    • Run Pipeline    — Company input → real-time pipeline animation → results
+    • Analysis        — Multi-company comparison (side-by-side, charts)
+    • Reports         — Searchable report archive with expandable cards
+    • Competitors     — Watchlist grid with signal strength + trend indicators
+    • Schedule        — Create/manage automated analysis jobs
+    • RAG Chat        — Upload report PDFs → AI-powered Q&A
+    • About           — Platform information with animated hero section
 
 
 ================================================================================
-11. DOCKER INFRASTRUCTURE
+12. DOCKER INFRASTRUCTURE
 ================================================================================
 
-5 services defined in docker-compose.yaml:
+7 services in docker-compose.yaml:
 
-SERVICE 1: app (Market Scout API)
-  • Built from Dockerfile
-  • Port 8000 → FastAPI
-  • Depends on: postgres (healthy), redis
-  • Gets API keys from .env file
+  SERVICE              CONTAINER              PORT    PURPOSE
+  ─────────────────────────────────────────────────────────────
+  FastAPI App          market_scout_app       8000    Backend API
+  Celery Worker        market_celery_worker   —       Async pipeline tasks
+  Flower               market_flower          5555    Task monitoring UI
+  PostgreSQL 15        market_postgres        5433    Relational database
+  Redis 7              market_redis           6379    Cache + broker
+  Prometheus           market_prometheus      9090    Metrics collection
+  Grafana              market_grafana         3000    Monitoring dashboards
 
-SERVICE 2: postgres (PostgreSQL 15)
-  • Port 5433 → 5432 (internal)
-  • Database: market_db
-  • Credentials: admin/admin
-  • Health check: pg_isready every 5s
-  • Volume: postgres_data (persistent)
-
-SERVICE 3: redis (Redis 7 Alpine)
-  • Port 6379
-  • Volume: redis_data (persistent)
-
-SERVICE 4: prometheus
-  • Port 9090
-  • Config: monitoring/prometheus.yml
-  • Scrapes localhost:8000/metrics every 15s
-  • Volume: prometheus_data (persistent)
-
-SERVICE 5: grafana
-  • Port 3000
-  • Credentials: admin/admin
-  • Auto-provisions dashboard from monitoring/grafana/
-  • Depends on: prometheus
-  • Volume: grafana_data (persistent)
-
-All services on the same Docker network: scout_net (bridge driver)
-
-================================================================================
-12. CLOUD DEPLOYMENT — AZURE (PRODUCTION SETUP)
-================================================================================
-The Market Scout Agent is deployed on Microsoft Azure using a hybrid cloud
-architecture with CI/CD automation.
-
-FRONTEND DEPLOYMENT:
-  • Deployed using Azure Static Web Apps
-  • Built with React + Vite
-  • Connected to backend via public API endpoint
-  • Domain configured using Namecheap:
-      https://market-scout.me
-  • HTTPS enabled automatically via Azure SSL
-
-BACKEND DEPLOYMENT:
-  • Hosted on Azure Virtual Machine (Ubuntu 14 LTS)
-  • Backend is containerized using Docker
-  • Application runs inside Docker container using:
-      uvicorn app.main:app
-  • Public API exposed via custom domain:
-      https://api.market-scout.me
-
-CI/CD PIPELINE:
-  • Implemented using GitHub Actions
-  • Workflow:
-      1. Code pushed to GitHub repository
-      2. GitHub Actions triggers deployment pipeline
-      3. Docker image is built automatically
-      4. Image is deployed to Azure VM
-  • Ensures automated and consistent deployments
-
-DOMAIN & NETWORKING:
-  • Domain purchased via Namecheap
-  • DNS configured to map:
-      - Frontend → market-scout.me
-      - Backend → api.market-scout.me
-  • Backend SSL configured manually using Certbot
-  • HTTPS enabled for secure API communication
-
-SECURITY:
-  • SSL/TLS enabled for both frontend and backend
-  • Environment variables used for sensitive data (API keys)
-  • No secrets stored in source code
-
-SCALABILITY & ARCHITECTURE:
-  • Backend runs as a containerized service → easily scalable
-  • Stateless API design enables horizontal scaling
-  • Redis caching improves performance and reduces API load
-
-LIVE ENDPOINTS:
-  • Frontend: https://market-scout.me
-  • Backend API: https://api.market-scout.me
-
-================================================================================
-13. SECURITY IMPLEMENTATION (OWASP)
-================================================================================
-
-A03 — INJECTION PREVENTION:
-  • HTML tag stripping in guardrails
-  • Regex-based format validation
-  • Blocked keyword detection (hack, exploit, jailbreak, etc.)
-  • Pydantic schema validation on all API inputs
-
-A05 — SECURITY MISCONFIGURATION:
-  • All secrets in .env file, never hardcoded in source
-  • Pydantic BaseSettings reads from environment variables
-
-A07 — XSS PREVENTION:
-  • HTML entity unescaping + sanitisation
-  • Structured JSON responses (no raw HTML in output)
-
-A10 — SSRF PREVENTION:
-  • Domain allowlist in config.py (ALLOWED_DOMAINS)
-  • Prefix-based allowlist (docs.*, developer.*, blog.*)
-  • Every scraped URL checked against the allowlist
-  • Unknown domains are blocked and logged
-
-RATE LIMITING:
-  • Redis-backed counter: 10 requests per 60-second window
-  • Enforced in the guardrails node before any LLM call
+  Network: scout_net (bridge driver)
+  Volumes: postgres_data, redis_data, prometheus_data, grafana_data
 
 
 ================================================================================
-14. HOW TO RUN THE PROJECT
+13. CLOUD DEPLOYMENT — AZURE
 ================================================================================
 
-PREREQUISITES:
-  • Docker Desktop installed and running
-  • Node.js 18+ installed (for frontend)
-  • Python 3.10+ with venv (already set up)
-  • API keys in .env file:
-      NVIDIA_API_KEY=your_key_here
-      TAVILY_API_KEY=your_key_here
+  FRONTEND:
+    • Azure Static Web Apps
+    • Domain: https://market-scout.me
+    • HTTPS via Azure SSL (automatic)
 
-STEP 1: Start infrastructure (PostgreSQL, Redis, Prometheus, Grafana)
-  > docker compose up -d postgres redis prometheus grafana
+  BACKEND:
+    • Azure Virtual Machine (Ubuntu LTS)
+    • Containerized with Docker
+    • Domain: https://api.market-scout.me
+    • SSL via Certbot (manual)
 
-STEP 2: Start the backend
-  > cd c:\Users\Sindhu\Desktop\Market_Scout
-  > .\venv\Scripts\activate
-  > uvicorn app.main:app --reload
+  CI/CD:
+    • GitHub Actions workflow
+    • Push to GitHub → build Docker image → deploy to Azure VM
 
-STEP 3: Start the frontend
-  > cd c:\Users\Sindhu\Desktop\Market_Scout\frontend
-  > npm run dev
+  SECURITY:
+    • SSL/TLS on both frontend and backend
+    • Environment variables for all secrets
+    • No credentials in source code
 
-ACCESS POINTS:
-  • Frontend:    http://localhost:5173
-  • Backend API: http://localhost:8000
-  • Swagger Docs:http://localhost:8000/docs
-  • Metrics:     http://localhost:8000/metrics
-  • Prometheus:  http://localhost:9090
-  • Grafana:     http://localhost:3000 (admin/admin)
+
+================================================================================
+14. SECURITY IMPLEMENTATION (OWASP)
+================================================================================
+
+  A03 — INJECTION PREVENTION:
+    • HTML tag stripping + entity unescaping in guardrails
+    • Regex format validation on all inputs
+    • Blocked keyword detection (hack, exploit, jailbreak, etc.)
+    • Pydantic schema validation on all API payloads
+
+  A05 — SECURITY MISCONFIGURATION:
+    • All secrets in .env file, never hardcoded
+    • Pydantic BaseSettings reads from environment
+
+  A07 — XSS PREVENTION:
+    • Input sanitisation + structured JSON responses
+    • No raw HTML in API output
+
+  A10 — SSRF PREVENTION:
+    • Domain allowlist in config.py
+    • Prefix-based allowlist (docs.*, developer.*, blog.*)
+    • Every scraped URL validated against the allowlist
+
+  RATE LIMITING:
+    • Redis-backed counter: 10 requests per 60-second window
+    • Enforced in guardrails node before any LLM call
 
 
 ================================================================================
 15. DATA FLOW — COMPLETE REQUEST LIFECYCLE
 ================================================================================
 
-User types "OpenAI" in the frontend → clicks "Run Pipeline"
-  ↓
-Frontend sends POST http://localhost:8000/run-agent {"company_name":"OpenAI"}
-  ↓
-FastAPI validates request via Pydantic (AgentRequest schema)
-  ↓
-ACTIVE_PIPELINES gauge incremented (+1)
-  ↓
-LangGraph pipeline invoked: graph.invoke({"company_name": "OpenAI"})
-  ↓
-Node 1: Guardrails → sanitise "OpenAI", check format, check keywords, check rate limit
-  ↓ (passes)
-Node 2: SEARCH AGENT : Search Planner → LLM generates ["OpenAI release notes 2026", "OpenAI API updates", ...] and Search Execution → Tavily returns 15 URLs, domain scoring + allowlist filtering
-  ↓ (e.g. 12 URLs pass)
-Node 3: SCRAPER AGENT : Scraper Strategy → For each URL: try Newspaper3k → BS4 → Playwright
-  ↓ (e.g. 10 articles scraped)
-Node 4: Date Validation → Filter to articles ≤ 7 days old, discard rest
-  ↓ (e.g. 7 articles pass)
-Node 5: Content Filter → Keep only technical articles
-  ↓ (e.g. 5 articles remain)
-Node 6: Authority Check → Rank by source credibility
-  ↓
-Node 7: Feature Extraction → LLM extracts structured features from each article
-  ↓ (e.g. 12 raw features)
-Node 8: Verification → SBERT clusters similar features → 8 unique features
-  ↓
-Node 9: Scoring → confidence = 0.3*recency + 0.4*verification + 0.3*authority
-  ↓
-Node 10: Synthesis → LLM generates executive summary + ranked feature report
-  ↓
-Pipeline complete → returns synthesis_report in GraphState
-  ↓
-FastAPI saves report + features to PostgreSQL (via CRUD layer)
-  ↓
-ACTIVE_PIPELINES gauge decremented (-1)
-PIPELINE_RUNS counter incremented (status="completed")
-  ↓
-Returns AgentResponse JSON to frontend
-  ↓
-Frontend renders: executive summary, feature cards with confidence badges, sources
+  User types "OpenAI" → clicks "Analyze"
+    ↓
+  Frontend sends POST /run-agent {"company_name": "OpenAI"}
+    ↓
+  FastAPI enqueues Celery task → returns {"task_id": "abc-123"}
+    ↓
+  Frontend polls GET /task/abc-123 every 2 seconds
+    ↓
+  Celery worker picks up the task
+    ↓
+  LangGraph pipeline invoked: graph.invoke({"company_name": "OpenAI"})
+    ↓
+  Stage 1:  Guardrails → sanitise, validate, rate-limit check
+  Stage 2:  Search Agent → LLM generates queries → Tavily returns URLs
+  Stage 3:  Scraper Agent → parallel scraping → 10 articles extracted
+  Stage 4:  Date Validation → filter to ≤7 days → 7 articles pass
+  Stage 5:  Content Filter → keep technical only → 5 articles remain
+  Stage 6:  Authority Check → rank by credibility
+  Stage 7:  Feature Extraction → LLM extracts 12 raw features
+  Stage 8:  Verification → SBERT clusters → 8 unique features
+  Stage 9:  Scoring → confidence = 0.3×recency + 0.4×verify + 0.3×authority
+  Stage 10: Synthesis → LLM generates executive summary + report
+    ↓
+  Pipeline complete → result stored in Celery backend
+    ↓
+  FastAPI saves report + features to PostgreSQL
+    ↓
+  Frontend receives result via polling → renders report
 
 
 ================================================================================
@@ -888,29 +660,33 @@ Frontend renders: executive summary, feature cards with confidence badges, sourc
 
 All settings in app/config.py (overridable via .env):
 
-  APP_NAME:              "Market Intelligence Scout"
-  DEBUG:                 False
-  NVIDIA_API_KEY:        (from .env)
-  LLM_MODEL:             "meta/llama-3.3-70b-instruct"
-  LLM_MAX_TOKENS:        4096
-  LLM_TEMPERATURE:       0.2
-  LLM_TOP_P:             0.7
-  TAVILY_API_KEY:        (from .env)
-  SEARCH_DEPTH:          "advanced"
-  SEARCH_MAX_RESULTS:    15
-  DATABASE_URL:          "postgresql://admin:admin@127.0.0.1:5433/market_db"
-  REDIS_HOST:            "localhost"
-  REDIS_PORT:            6379
-  CACHE_EXPIRY:          21600 (6 hours)
-  MAX_INPUT_LENGTH:      200
-  RATE_LIMIT_REQUESTS:   10
-  RATE_LIMIT_WINDOW:     60
-  SCRAPE_TIMEOUT:        15
-  MAX_ARTICLE_LENGTH:    8000
-  SBERT_MODEL:           "all-MiniLM-L6-v2"
-  SIMILARITY_THRESHOLD:  0.85
-  DATE_WINDOW_DAYS:      7
-  MAX_RETRIES:           3
+  Setting                  Default Value
+  ───────────────────────────────────────────────────────────
+  APP_NAME                 "Market Intelligence Scout"
+  DEBUG                    False
+  NVIDIA_API_KEY           (from .env)
+  LLM_MODEL                "meta/llama-3.3-70b-instruct"
+  LLM_MAX_TOKENS           4096
+  LLM_TEMPERATURE          0.2
+  LLM_TOP_P                0.7
+  TAVILY_API_KEY           (from .env)
+  SEARCH_DEPTH             "advanced"
+  SEARCH_MAX_RESULTS       15
+  DATABASE_URL             "postgresql://admin:admin@127.0.0.1:5433/market_db"
+  REDIS_HOST               "localhost"
+  REDIS_PORT               6379
+  CACHE_EXPIRY             21600 (6 hours)
+  CELERY_BROKER_URL        "redis://redis:6379/1"
+  CELERY_RESULT_BACKEND    "redis://redis:6379/2"
+  MAX_INPUT_LENGTH         200
+  RATE_LIMIT_REQUESTS      10
+  RATE_LIMIT_WINDOW        60
+  SCRAPE_TIMEOUT           15
+  MAX_ARTICLE_LENGTH       8000
+  SBERT_MODEL              "all-MiniLM-L6-v2"
+  SIMILARITY_THRESHOLD     0.85
+  DATE_WINDOW_DAYS         7
+  MAX_RETRIES              3
 
 
 ================================================================================

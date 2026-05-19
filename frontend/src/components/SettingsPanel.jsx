@@ -99,6 +99,26 @@ export default function SettingsPanel({ isOpen, onClose }) {
                 </div>
               </div>
 
+              <div className="setting-group">
+                <label className="setting-label">
+                  <span className="setting-label-text">Force fresh analysis</span>
+                  <span className="setting-hint">
+                    Next run deletes that company&apos;s stored report (Redis + database,
+                    within the 6-hour cache window) for the selected time window, then
+                    runs a full new analysis
+                  </span>
+                </label>
+                <div className="setting-options-row">
+                  <button
+                    type="button"
+                    className={`setting-chip ${settings.analysis.forceRefresh ? 'active' : ''}`}
+                    onClick={() => updateAnalysis({ forceRefresh: !settings.analysis.forceRefresh })}
+                  >
+                    {settings.analysis.forceRefresh ? 'On' : 'Off'}
+                  </button>
+                </div>
+              </div>
+
               {/* Confidence Threshold */}
               <div className="setting-group">
                 <label className="setting-label">
