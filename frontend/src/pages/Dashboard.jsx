@@ -65,7 +65,7 @@ export default function Dashboard() {
   const recencyWindow = `${settings?.analysis?.timeWindow || 7} Days`;
 
   return (
-    <div className="overview-page fade-in">
+    <div>
 
       {/* ── Hero Header ─────────────────────────────────────── */}
       <div className="overview-hero">

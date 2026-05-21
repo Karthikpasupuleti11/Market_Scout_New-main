@@ -310,18 +310,17 @@ export default function RunPipeline() {
             ══════════════════════════════════════════════════════ */}
       <div className="intel-main-col">
         {/* ── Header ─────────────────────────────────────── */}
-    
 
         <SectionHeader
-  icon={HiOutlineLightningBolt}
-  title="Intelligence"
-  subtitle={`Analyze a company's competitive landscape — discover verified technical signals from the past ${settings.analysis.timeWindow} days`}
-  loading={loading}
-  onRefresh={() => {
-    if (!company.trim()) return;
-    executePipeline(company);
-  }}
-/>
+          icon={HiOutlineLightningBolt}
+          title="Intelligence"
+          subtitle={`Analyze a company's competitive landscape — discover verified technical signals from the past ${settings.analysis.timeWindow} days`}
+          loading={loading}
+          onRefresh={() => {
+            if (!company.trim()) return;
+            executePipeline(company);
+          }}
+        />
 
         {/* ── Input Area ──────────────────────────────────── */}
         <form className="intel-input-section card" onSubmit={handleRun}>
