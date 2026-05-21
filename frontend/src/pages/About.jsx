@@ -103,12 +103,8 @@ export default function About() {
 
     return (
         <div className="about-page fade-in">
-
-
+            {/* 1. HERO STRIP */}
             <section className="about-visual-strip fade-in-up">
-                <div className="about-orb orb-1" />
-                <div className="about-orb orb-2" />
-                <div className="about-orb orb-3" />
                 <div className="about-strip-content">
                     <h1>Market Intelligence. Structured for action.</h1>
                     <p>
@@ -118,11 +114,12 @@ export default function About() {
                 </div>
             </section>
 
+            {/* 2. HERO CARD WITH STATS */}
             <section className="card about-hero-card fade-in-up stagger">
                 <div className="about-hero-text">
                     <div className="about-hero-tags">
-                        <span><HiOutlineGlobeAlt /> Live market signals</span>
-                        <span><HiOutlineTrendingUp /> Strategy-grade insights</span>
+                        <span><HiOutlineGlobeAlt /> Live Signals</span>
+                        <span><HiOutlineTrendingUp /> Strategy Insights</span>
                     </div>
                     <h2>Built for intelligence teams that move fast</h2>
                     <p>
@@ -144,14 +141,15 @@ export default function About() {
                     <div className="about-stat">
                         <i><HiOutlineClock /></i>
                         <span>Automation</span>
-                        <strong>Recurring schedules</strong>
+                        <strong>Recurring</strong>
                     </div>
                 </div>
             </section>
 
+            {/* 3. VALUE PROPS GRID */}
             <section className="about-value-grid">
                 {valueProps.map((item, idx) => (
-                    <article className="card about-value-card fade-in-up" key={item.title} style={{ animationDelay: `${idx * 0.08}s` }}>
+                    <article className="card about-value-card fade-in-up" key={item.title} style={{ animationDelay: `${idx * 0.1}s` }}>
                         <div className="about-value-icon">{item.icon}</div>
                         <h3>{item.title}</h3>
                         <p>{item.text}</p>
@@ -159,38 +157,39 @@ export default function About() {
                 ))}
             </section>
 
+            {/* 4. INTELLIGENCE FLOW TRACK */}
             <section className="card about-flow-card fade-in-up">
                 <div className="about-section-head">
                     <h3>
                         <HiOutlineLightningBolt />
-                        Intelligence flow
+                        Intelligence Flow
                     </h3>
                     <p>How information moves from raw signal to decision-ready output.</p>
                 </div>
                 <div className="about-flow-track">
                     {flow.map((step, i) => (
-                        <article className="flow-step" key={step.title} style={{ animationDelay: `${i * 0.08}s` }}>
+                        <article className="flow-step" key={step.title} style={{ animationDelay: `${i * 0.1}s` }}>
                             <div className="flow-step-icon">{step.icon}</div>
                             <div className="flow-step-content">
-                                <div className="flow-step-title-row">
+                                <h4>
                                     <span className="flow-step-index">{String(i + 1).padStart(2, '0')}</span>
-                                    <h4>{step.title}</h4>
-                                </div>
+                                    {step.title}
+                                </h4>
                                 <p>{step.text}</p>
                             </div>
                             <HiOutlineArrowRight className="flow-step-arrow" />
-                            {i < flow.length - 1 && <span className="flow-link" />}
                         </article>
                     ))}
                 </div>
             </section>
 
+            {/* 5. CAPABILITIES GRID */}
             <section className="about-capabilities">
                 {capabilities.map((item, index) => (
                     <article
                         className="card capability-card fade-in-up clickable"
                         key={item.title}
-                        style={{ animationDelay: `${0.06 * index}s` }}
+                        style={{ animationDelay: `${0.1 * index}s` }}
                         onClick={() => setSelectedCapability(item)}
                     >
                         <div className="capability-icon">{item.icon}</div>
@@ -204,6 +203,7 @@ export default function About() {
                 ))}
             </section>
 
+            {/* 6. FINAL DETAILS */}
             <section className="card about-details-card fade-in-up">
                 <div className="about-detail-block">
                     <h3>
@@ -226,28 +226,25 @@ export default function About() {
                         Built as a modular intelligence dashboard with dedicated pages for overview, pipeline execution, analysis,
                         reports, watchlist tracking, and scheduled automation.
                     </p>
-                    <p>
-                        Version: <strong>v2.0</strong>
-                    </p>
                     <div className="about-trust-row">
                         <span><HiOutlineCheckCircle /> Evidence-backed insights</span>
-                        <span><HiOutlineCheckCircle /> Cross-page consistency</span>
+                        <span><HiOutlineCheckCircle /> Version v2.0 Platform</span>
                     </div>
                 </div>
             </section>
 
-            {/* Modal for Core Capabilities */}
+            {/* MODAL */}
             {selectedCapability && (
-                <div className="about-modal-overlay fade-in" onClick={() => setSelectedCapability(null)}>
-                    <div className="about-modal-content fade-in-up" onClick={(e) => e.stopPropagation()}>
+                <div className="about-modal-overlay" onClick={() => setSelectedCapability(null)}>
+                    <div className="about-modal-content" onClick={(e) => e.stopPropagation()}>
                         <button className="about-modal-close" onClick={() => setSelectedCapability(null)}>
                             <HiOutlineX />
                         </button>
-                        <div className="about-modal-icon">{selectedCapability.icon}</div>
+                        <div className="about-value-icon" style={{margin: '0 auto 20px'}}>{selectedCapability.icon}</div>
                         <h2>{selectedCapability.title}</h2>
-                        <p className="about-modal-desc">{selectedCapability.text}</p>
-                        <div className="about-modal-detail">
-                            This module is a core part of the Market Scout platform, designed to streamline your daily workflow and provide actionable strategic intelligence.
+                        <p style={{color: '#64748b', marginBottom: '24px'}}>{selectedCapability.text}</p>
+                        <div style={{background: '#f8fafc', padding: '20px', borderRadius: '16px', fontSize: '0.9rem', color: '#475569'}}>
+                            This module is a core part of the Market Scout platform, designed to provide actionable strategic intelligence.
                         </div>
                     </div>
                 </div>

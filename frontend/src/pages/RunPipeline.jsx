@@ -1,712 +1,906 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
-import { useSettings } from '../contexts/SettingsContext';
-import { usePipeline } from '../contexts/PipelineContext';
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useLocation } from "react-router-dom";
+import { useSettings } from "../contexts/SettingsContext";
+import { usePipeline } from "../contexts/PipelineContext";
 import {
-    HiOutlineLightningBolt,
-    HiOutlineExternalLink,
-    HiOutlineExclamationCircle,
-    HiOutlineDownload,
-    HiOutlineChevronDown,
-    HiOutlineChevronUp,
-    HiOutlineFilter,
-    HiOutlineSortDescending,
-    HiOutlineXCircle,
-    HiOutlineChatAlt2,
-    HiOutlineSparkles,
-} from 'react-icons/hi';
-import { generateReportPDF } from '../utils/pdfExport';
-import ReportAssistant from '../components/ReportAssistant';
-import { formatDateTime } from '../utils/formatDate';
-import './RunPipeline.css';
-
-const SUGGESTIONS = ['Google', 'OpenAI', 'Microsoft', 'Anthropic', 'Meta AI', 'Tesla'];
+  HiOutlineLightningBolt,
+  HiOutlineExternalLink,
+  HiOutlineExclamationCircle,
+  HiOutlineDownload,
+  HiOutlineChevronDown,
+  HiOutlineChevronUp,
+  HiOutlineFilter,
+  HiOutlineSortDescending,
+  HiOutlineXCircle,
+  HiOutlineChatAlt2,
+  HiOutlineSparkles,
+} from "react-icons/hi";
+import { generateReportPDF } from "../utils/pdfExport";
+import ReportAssistant from "../components/ReportAssistant";
+import { formatDateTime } from "../utils/formatDate";
+import "./RunPipeline.css";
+import SectionHeader from "../components/SectionHeader";
+const SUGGESTIONS = [
+  "Google",
+  "OpenAI",
+  "Microsoft",
+  "Anthropic",
+  "Meta AI",
+  "Tesla",
+];
 
 const PIPELINE_STAGES = [
-    'Guardrails', 'Search Agent', 'Scraper Agent', 'Date Validation',
-    'Content Filter', 'Authority Check', 'Feature Extraction',
-    'Verification', 'Scoring', 'Synthesis'
+  "Guardrails",
+  "Search Agent",
+  "Scraper Agent",
+  "Date Validation",
+  "Content Filter",
+  "Authority Check",
+  "Feature Extraction",
+  "Verification",
+  "Scoring",
+  "Synthesis",
 ];
 
 /* ── Insight tag logic ─────────────────────────────────────────── */
 function getCategoryTag(category) {
-    if (!category) return 'capability';
-    const lower = category.toLowerCase();
-    if (lower.includes('security') || lower.includes('privacy')) return 'security';
-    if (lower.includes('infra') || lower.includes('cloud')) return 'infrastructure';
-    if (lower.includes('model') || lower.includes('llm') || lower.includes('ai')) return 'model';
-    if (lower.includes('platform') || lower.includes('enterprise')) return 'platform';
-    if (lower.includes('developer') || lower.includes('api') || lower.includes('sdk')) return 'developer';
-    if (lower.includes('product') || lower.includes('feature')) return 'product';
-    return 'capability';
+  if (!category) return "capability";
+  const lower = category.toLowerCase();
+  if (lower.includes("security") || lower.includes("privacy"))
+    return "security";
+  if (lower.includes("infra") || lower.includes("cloud"))
+    return "infrastructure";
+  if (lower.includes("model") || lower.includes("llm") || lower.includes("ai"))
+    return "model";
+  if (lower.includes("platform") || lower.includes("enterprise"))
+    return "platform";
+  if (
+    lower.includes("developer") ||
+    lower.includes("api") ||
+    lower.includes("sdk")
+  )
+    return "developer";
+  if (lower.includes("product") || lower.includes("feature")) return "product";
+  return "capability";
 }
 
 /* ── Strategic Direction ────────────────────────────────────────── */
 function deriveStrategicDirections(features) {
-    if (!features?.length) return [];
-    const allText = features.map(f =>
-        `${f.title || ''} ${f.description || ''} ${f.category || ''}`
-    ).join(' ').toLowerCase();
+  if (!features?.length) return [];
+  const allText = features
+    .map((f) => `${f.title || ""} ${f.description || ""} ${f.category || ""}`)
+    .join(" ")
+    .toLowerCase();
 
-    const RULES = [
-        { keywords: ['agent', 'autonomous', 'agentic'], label: 'Agentic Systems Expansion' },
-        { keywords: ['llm', 'foundation model', 'training', 'fine-tun'], label: 'Foundation Model Investment' },
-        { keywords: ['tpu', 'gpu', 'compute', 'scale', 'datacenter'], label: 'AI Infrastructure Scaling' },
-        { keywords: ['multi-cloud', 'cross-cloud', 'hybrid cloud'], label: 'Cloud Consolidation Strategy' },
-        { keywords: ['api', 'sdk', 'developer', 'toolkit', 'open source'], label: 'Developer Ecosystem Growth' },
-        { keywords: ['security', 'privacy', 'compliance', 'zero trust'], label: 'Enterprise Security Hardening' },
-        { keywords: ['enterprise', 'saas', 'b2b', 'workspace'], label: 'Enterprise Platform Strategy' },
-        { keywords: ['launch', 'release', 'feature', 'product'], label: 'Product Innovation Push' },
-        { keywords: ['edge', 'on-device', 'mobile', 'lightweight'], label: 'Edge AI Deployment' },
-        { keywords: ['search', 'retrieval', 'rag', 'knowledge'], label: 'Knowledge System Expansion' },
-        { keywords: ['video', 'image', 'multimodal', 'vision'], label: 'Multimodal AI Strategy' },
-        { keywords: ['cost', 'pricing', 'free tier', 'affordable'], label: 'Market Accessibility Push' },
-    ];
+  const RULES = [
+    {
+      keywords: ["agent", "autonomous", "agentic"],
+      label: "Agentic Systems Expansion",
+    },
+    {
+      keywords: ["llm", "foundation model", "training", "fine-tun"],
+      label: "Foundation Model Investment",
+    },
+    {
+      keywords: ["tpu", "gpu", "compute", "scale", "datacenter"],
+      label: "AI Infrastructure Scaling",
+    },
+    {
+      keywords: ["multi-cloud", "cross-cloud", "hybrid cloud"],
+      label: "Cloud Consolidation Strategy",
+    },
+    {
+      keywords: ["api", "sdk", "developer", "toolkit", "open source"],
+      label: "Developer Ecosystem Growth",
+    },
+    {
+      keywords: ["security", "privacy", "compliance", "zero trust"],
+      label: "Enterprise Security Hardening",
+    },
+    {
+      keywords: ["enterprise", "saas", "b2b", "workspace"],
+      label: "Enterprise Platform Strategy",
+    },
+    {
+      keywords: ["launch", "release", "feature", "product"],
+      label: "Product Innovation Push",
+    },
+    {
+      keywords: ["edge", "on-device", "mobile", "lightweight"],
+      label: "Edge AI Deployment",
+    },
+    {
+      keywords: ["search", "retrieval", "rag", "knowledge"],
+      label: "Knowledge System Expansion",
+    },
+    {
+      keywords: ["video", "image", "multimodal", "vision"],
+      label: "Multimodal AI Strategy",
+    },
+    {
+      keywords: ["cost", "pricing", "free tier", "affordable"],
+      label: "Market Accessibility Push",
+    },
+  ];
 
-    return RULES.filter(rule =>
-        rule.keywords.some(kw => allText.includes(kw))
-    ).map(r => r.label).slice(0, 5);
+  return RULES.filter((rule) =>
+    rule.keywords.some((kw) => allText.includes(kw))
+  )
+    .map((r) => r.label)
+    .slice(0, 5);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
    MAIN PAGE
    ═══════════════════════════════════════════════════════════════════ */
 export default function RunPipeline() {
-    const location = useLocation();
-    const { settings } = useSettings();
+  const location = useLocation();
+  const { settings } = useSettings();
 
-    const {
-        company, setCompany,
-        loading,
-        result,
-        error,
-        activeStage,
-        completedStages,
-        stageLatencies,
-        elapsed,
-        executePipeline,
-        stopPipeline,
-    } = usePipeline();
+  const {
+    company,
+    setCompany,
+    loading,
+    result,
+    error,
+    activeStage,
+    completedStages,
+    stageLatencies,
+    elapsed,
+    executePipeline,
+    stopPipeline,
+  } = usePipeline();
 
-    // ── Local-only UI state ──────────────────────────────────────
-    const [pdfLoading, setPdfLoading] = useState(false);
-    const [sourcesExpanded, setSourcesExpanded] = useState(false);
-    const [filterCategory, setFilterCategory] = useState('all');
-    const [filterConfidence, setFilterConfidence] = useState('all');
-    const [sortBy, setSortBy] = useState('confidence');
-    const [expandedSignals, setExpandedSignals] = useState(new Set());
-    const [assistantAutoOpen, setAssistantAutoOpen] = useState(false);
+  // ── Local-only UI state ──────────────────────────────────────
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [sourcesExpanded, setSourcesExpanded] = useState(false);
+  const [filterCategory, setFilterCategory] = useState("all");
+  const [filterConfidence, setFilterConfidence] = useState("all");
+  const [sortBy, setSortBy] = useState("confidence");
+  const [expandedSignals, setExpandedSignals] = useState(new Set());
+  const [assistantAutoOpen, setAssistantAutoOpen] = useState(false);
 
-    // Prevent duplicate auto-runs when navigated here via location.state
-    const lastAutoRunCompanyRef = useRef('');
-    const reportAssistantRef = useRef(null);
+  // Prevent duplicate auto-runs when navigated here via location.state
+  const lastAutoRunCompanyRef = useRef("");
+  const reportAssistantRef = useRef(null);
 
-    const toggleSignal = useCallback((idx) => {
-        setExpandedSignals(prev => {
-            const next = new Set(prev);
-            if (next.has(idx)) next.delete(idx);
-            else next.add(idx);
-            return next;
-        });
-    }, []);
+  const toggleSignal = useCallback((idx) => {
+    setExpandedSignals((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  }, []);
 
-    const report = result?.report || result;
-    const fromCache = result?.from_cache || report?.metadata?.from_cache;
-    const pipelineNotice = report?.metadata?.error;
-    const hasSignals = (report?.features?.length ?? 0) > 0;
+  const report = result?.report || result;
+  const fromCache = result?.from_cache || report?.metadata?.from_cache;
+  const pipelineNotice = report?.metadata?.error;
+  const hasSignals = (report?.features?.length ?? 0) > 0;
 
-    const handleDownloadPDF = async () => {
-        if (!report) return;
-        setPdfLoading(true);
-        try {
-            await new Promise(r => setTimeout(r, 50));
-            generateReportPDF(report, company);
-        } finally {
-            setPdfLoading(false);
-        }
-    };
+  const handleDownloadPDF = async () => {
+    if (!report) return;
+    setPdfLoading(true);
+    try {
+      await new Promise((r) => setTimeout(r, 50));
+      generateReportPDF(report, company);
+    } finally {
+      setPdfLoading(false);
+    }
+  };
 
-    const scrollToReportAssistant = useCallback(() => {
-        setAssistantAutoOpen(true);
-        reportAssistantRef.current?.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start',
-        });
-    }, []);
+  const scrollToReportAssistant = useCallback(() => {
+    setAssistantAutoOpen(true);
+    reportAssistantRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, []);
 
-    const handleRun = async (e) => {
-        e.preventDefault();
-        setExpandedSignals(new Set());
-        setFilterCategory('all');
-        setFilterConfidence('all');
-        await executePipeline(company);
-    };
+  const handleRun = async (e) => {
+    e.preventDefault();
+    setExpandedSignals(new Set());
+    setFilterCategory("all");
+    setFilterConfidence("all");
+    await executePipeline(company);
+  };
 
-    // Auto-run when navigated here from another page (e.g. Watchlist)
-    useEffect(() => {
-        const autoRunCompany = location.state?.autoRunCompany;
-        if (!autoRunCompany || loading) return;
-        if (lastAutoRunCompanyRef.current === autoRunCompany) return;
-        lastAutoRunCompanyRef.current = autoRunCompany;
-        setCompany(autoRunCompany);
-        executePipeline(autoRunCompany);
-    }, [location.state, executePipeline, loading, setCompany]);
+  // Auto-run when navigated here from another page (e.g. Watchlist)
+  useEffect(() => {
+    const autoRunCompany = location.state?.autoRunCompany;
+    if (!autoRunCompany || loading) return;
+    if (lastAutoRunCompanyRef.current === autoRunCompany) return;
+    lastAutoRunCompanyRef.current = autoRunCompany;
+    setCompany(autoRunCompany);
+    executePipeline(autoRunCompany);
+  }, [location.state, executePipeline, loading, setCompany]);
 
-    // ── Derived data ─────────────────────────────────────────────
-    const allCategories = useMemo(() => {
-        if (!report?.features?.length) return [];
-        return [...new Set(report.features.map(f => f.category || 'General'))].sort();
-    }, [report]);
+  // ── Derived data ─────────────────────────────────────────────
+  const allCategories = useMemo(() => {
+    if (!report?.features?.length) return [];
+    return [
+      ...new Set(report.features.map((f) => f.category || "General")),
+    ].sort();
+  }, [report]);
 
-    const distribution = useMemo(() => {
-        if (!report?.features?.length) return [];
-        const counts = {};
-        report.features.forEach(f => {
-            const cat = f.category || 'General';
-            counts[cat] = (counts[cat] || 0) + 1;
-        });
-        return Object.entries(counts)
-            .map(([cat, count]) => ({
-                category: cat,
-                count,
-                pct: Math.round((count / report.features.length) * 100),
-                tag: getCategoryTag(cat),
-            }))
-            .sort((a, b) => b.count - a.count);
-    }, [report]);
+  const distribution = useMemo(() => {
+    if (!report?.features?.length) return [];
+    const counts = {};
+    report.features.forEach((f) => {
+      const cat = f.category || "General";
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([cat, count]) => ({
+        category: cat,
+        count,
+        pct: Math.round((count / report.features.length) * 100),
+        tag: getCategoryTag(cat),
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [report]);
 
-    const filteredSignals = useMemo(() => {
-        if (!report?.features?.length) return [];
-        let signals = [...report.features];
+  const filteredSignals = useMemo(() => {
+    if (!report?.features?.length) return [];
+    let signals = [...report.features];
 
-        if (filterCategory !== 'all') {
-            signals = signals.filter(f => (f.category || 'General') === filterCategory);
-        }
+    if (filterCategory !== "all") {
+      signals = signals.filter(
+        (f) => (f.category || "General") === filterCategory
+      );
+    }
 
-        const threshold = settings.analysis.confidenceThreshold / 100;
-        signals = signals.filter(f => {
-            const score = f.confidence_score ?? f.confidence ?? 0;
-            return score >= threshold;
-        });
+    const threshold = settings.analysis.confidenceThreshold / 100;
+    signals = signals.filter((f) => {
+      const score = f.confidence_score ?? f.confidence ?? 0;
+      return score >= threshold;
+    });
 
-        if (filterConfidence !== 'all') {
-            signals = signals.filter(f => {
-                const score = f.confidence_score ?? f.confidence ?? 0;
-                if (filterConfidence === 'high') return score >= 0.7;
-                if (filterConfidence === 'mid') return score >= 0.4 && score < 0.7;
-                if (filterConfidence === 'low') return score < 0.4;
-                return true;
-            });
-        }
+    if (filterConfidence !== "all") {
+      signals = signals.filter((f) => {
+        const score = f.confidence_score ?? f.confidence ?? 0;
+        if (filterConfidence === "high") return score >= 0.7;
+        if (filterConfidence === "mid") return score >= 0.4 && score < 0.7;
+        if (filterConfidence === "low") return score < 0.4;
+        return true;
+      });
+    }
 
-        if (sortBy === 'confidence') {
-            signals.sort((a, b) => (b.confidence_score ?? b.confidence ?? 0) - (a.confidence_score ?? a.confidence ?? 0));
-        } else if (sortBy === 'category') {
-            signals.sort((a, b) => (a.category || '').localeCompare(b.category || ''));
-        }
+    if (sortBy === "confidence") {
+      signals.sort(
+        (a, b) =>
+          (b.confidence_score ?? b.confidence ?? 0) -
+          (a.confidence_score ?? a.confidence ?? 0)
+      );
+    } else if (sortBy === "category") {
+      signals.sort((a, b) =>
+        (a.category || "").localeCompare(b.category || "")
+      );
+    }
 
-        return signals;
-    }, [report, filterCategory, filterConfidence, sortBy, settings.analysis]);
+    return signals;
+  }, [report, filterCategory, filterConfidence, sortBy, settings.analysis]);
 
-    const avgConfidence = useMemo(() => {
-        if (!report?.features?.length) return 0;
-        const scores = report.features
-            .map(f => f.confidence_score ?? f.confidence)
-            .filter(s => s != null);
-        return scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
-    }, [report]);
+  const avgConfidence = useMemo(() => {
+    if (!report?.features?.length) return 0;
+    const scores = report.features
+      .map((f) => f.confidence_score ?? f.confidence)
+      .filter((s) => s != null);
+    return scores.length
+      ? scores.reduce((a, b) => a + b, 0) / scores.length
+      : 0;
+  }, [report]);
 
-    const strategicDirections = useMemo(() =>
-        deriveStrategicDirections(report?.features), [report]);
+  const strategicDirections = useMemo(
+    () => deriveStrategicDirections(report?.features),
+    [report]
+  );
 
-    const hasResults = !!(result && report);
+  const hasResults = !!(result && report);
 
-    return (
-        /* Outer wrapper splits page into [main | sidebar] when results are shown */
-        <div className={`intelligence-page fade-in ${hasResults ? 'with-sidebar' : ''}`}>
-
-            {/* ══════════════════════════════════════════════════════
+  return (
+    /* Outer wrapper splits page into [main | sidebar] when results are shown */
+    <div
+      className={`intelligence-page fade-in ${
+        hasResults ? "with-sidebar" : ""
+      }`}
+    >
+      {/* ══════════════════════════════════════════════════════
                 MAIN COLUMN
             ══════════════════════════════════════════════════════ */}
-            <div className="intel-main-col">
+      <div className="intel-main-col">
+        {/* ── Header ─────────────────────────────────────── */}
+    
 
-                {/* ── Header ─────────────────────────────────────── */}
-                <div className="page-header">
-                    <h1>Intelligence</h1>
-                    <p>Analyze a company's competitive landscape — discover verified technical signals from the past {settings.analysis.timeWindow} days</p>
-                </div>
+        <SectionHeader
+  icon={HiOutlineLightningBolt}
+  title="Intelligence"
+  subtitle={`Analyze a company's competitive landscape — discover verified technical signals from the past ${settings.analysis.timeWindow} days`}
+  loading={loading}
+  onRefresh={() => {
+    if (!company.trim()) return;
+    executePipeline(company);
+  }}
+/>
 
-                {/* ── Input Area ──────────────────────────────────── */}
-                <form className="intel-input-section card" onSubmit={handleRun}>
-                    <div className="intel-input-row">
-                        <div className="intel-input-wrapper">
-                            <HiOutlineLightningBolt className="intel-input-icon" />
-                            <input
-                                type="text"
-                                className="input intel-input"
-                                placeholder="Enter a company name to analyze..."
-                                value={company}
-                                onChange={e => setCompany(e.target.value)}
-                                disabled={loading}
-                                maxLength={200}
-                            />
-                        </div>
-                        <button
-                            type="submit"
-                            className="btn btn-primary btn-lg intel-run-btn"
-                            disabled={loading || !company.trim()}
-                        >
-                            {loading ? (
-                                <><span className="spinner" /> Analyzing...</>
-                            ) : (
-                                <><HiOutlineLightningBolt /> Analyze</>
-                            )}
-                        </button>
-                        {loading && (
-                            <button
-                                type="button"
-                                className="btn btn-danger btn-lg intel-stop-btn"
-                                onClick={stopPipeline}
-                            >
-                                <HiOutlineXCircle /> Stop
-                            </button>
-                        )}
-                    </div>
-
-                    <div className="intel-suggestions">
-                        {SUGGESTIONS.map(s => (
-                            <button
-                                key={s}
-                                type="button"
-                                className="suggestion-chip"
-                                onClick={() => setCompany(s)}
-                                disabled={loading}
-                            >
-                                {s}
-                            </button>
-                        ))}
-                    </div>
-                </form>
-
-            {/* ── Pipeline Animation (reads from context — survives tab switch) ── */}
+        {/* ── Input Area ──────────────────────────────────── */}
+        <form className="intel-input-section card" onSubmit={handleRun}>
+          <div className="intel-input-row">
+            <div className="intel-input-wrapper">
+              <HiOutlineLightningBolt className="intel-input-icon" />
+              <input
+                type="text"
+                className="input intel-input"
+                placeholder="Enter a company name to analyze..."
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                disabled={loading}
+                maxLength={200}
+              />
+            </div>
+            <button
+              type="submit"
+              className="btn btn-primary btn-lg intel-run-btn"
+              disabled={loading || !company.trim()}
+            >
+              {loading ? (
+                <>
+                  <span className="spinner" /> Analyzing...
+                </>
+              ) : (
+                <>
+                  <HiOutlineLightningBolt /> Analyze
+                </>
+              )}
+            </button>
             {loading && (
-                <PipelineAnimation
-                    company={company}
-                    activeStage={activeStage}
-                    completedStages={completedStages}
-                    stageLatencies={stageLatencies}
-                    elapsed={elapsed}
-                />
+              <button
+                type="button"
+                className="btn btn-danger btn-lg intel-stop-btn"
+                onClick={stopPipeline}
+              >
+                <HiOutlineXCircle /> Stop
+              </button>
+            )}
+          </div>
+
+          <div className="intel-suggestions">
+            {SUGGESTIONS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                className="suggestion-chip"
+                onClick={() => setCompany(s)}
+                disabled={loading}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </form>
+
+        {/* ── Pipeline Animation (reads from context — survives tab switch) ── */}
+        {loading && (
+          <PipelineAnimation
+            company={company}
+            activeStage={activeStage}
+            completedStages={completedStages}
+            stageLatencies={stageLatencies}
+            elapsed={elapsed}
+          />
+        )}
+
+        {/* ── Error ──────────────────────────────────────── */}
+        {error && (
+          <div className="card error-section fade-in">
+            <HiOutlineExclamationCircle className="error-icon" />
+            <div>
+              <h3>Analysis Failed</h3>
+              <p>{error}</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Results ────────────────────────────────────── */}
+        {result && report && (
+          <div className="results-section fade-in-up">
+            {!hasSignals && (pipelineNotice || report.executive_summary) && (
+              <div className="card pipeline-notice-card fade-in">
+                <HiOutlineExclamationCircle className="notice-icon" />
+                <div>
+                  <h3>No verified signals in this window</h3>
+                  <p>{report.executive_summary}</p>
+                </div>
+              </div>
             )}
 
-                {/* ── Error ──────────────────────────────────────── */}
-                {error && (
-                    <div className="card error-section fade-in">
-                        <HiOutlineExclamationCircle className="error-icon" />
-                        <div>
-                            <h3>Analysis Failed</h3>
-                            <p>{error}</p>
-                        </div>
+            <div className="card result-header-card">
+              <div className="result-header-row">
+                <div className="result-meta">
+                  <h2>{report.company_name || company}</h2>
+                  <div className="result-badges">
+                    {fromCache && (
+                      <span className="badge badge-success">Cached</span>
+                    )}
+                    <span className="badge badge-accent">
+                      {report.total_features_verified ||
+                        report.features?.length ||
+                        0}{" "}
+                      Signals
+                    </span>
+                    <span className="badge badge-info">
+                      {report.total_sources_analysed || 0} Sources
+                    </span>
+                    {distribution.length > 0 && (
+                      <span className="badge badge-purple">
+                        {distribution.length} Themes
+                      </span>
+                    )}
+                    {report.generated_at && (
+                      <span className="badge badge-warning">
+                        {formatDateTime(report.generated_at)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="result-header-actions">
+                  <button
+                    className="btn btn-pdf"
+                    onClick={handleDownloadPDF}
+                    disabled={pdfLoading || loading}
+                    title="Download report as PDF"
+                    id="download-pdf-btn"
+                    type="button"
+                  >
+                    {pdfLoading ? (
+                      <>
+                        <span className="spinner spinner-sm" /> Generating…
+                      </>
+                    ) : (
+                      <>
+                        <HiOutlineDownload /> Download PDF
+                      </>
+                    )}
+                  </button>
+                  <button
+                    className="btn btn-report-assistant-jump"
+                    type="button"
+                    onClick={scrollToReportAssistant}
+                    title="Jump to Report Assistant chat below"
+                  >
+                    <HiOutlineChatAlt2 />
+                    Report Assistant
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {(report.executive_summary || distribution.length > 0) && (
+              <div className="insight-grid fade-in-up">
+                {report.executive_summary && (
+                  <div className="card card-accent executive-card">
+                    <div className="executive-label">Executive Insight</div>
+                    <p className="executive-text">{report.executive_summary}</p>
+                    <div className="executive-stats">
+                      <div className="exec-stat">
+                        <span className="exec-stat-value">
+                          {report.features?.length || 0}
+                        </span>
+                        <span className="exec-stat-label">Signals</span>
+                      </div>
+                      <div className="exec-stat">
+                        <span className="exec-stat-value">
+                          {report.total_sources_analysed || 0}
+                        </span>
+                        <span className="exec-stat-label">Sources</span>
+                      </div>
+                      <div className="exec-stat">
+                        <span
+                          className={`exec-stat-value ${
+                            avgConfidence >= 0.7
+                              ? "text-success"
+                              : avgConfidence >= 0.4
+                              ? "text-warning"
+                              : "text-error"
+                          }`}
+                        >
+                          {(avgConfidence * 100).toFixed(0)}%
+                        </span>
+                        <span className="exec-stat-label">Avg Confidence</span>
+                      </div>
                     </div>
+                    {strategicDirections.length > 0 && (
+                      <div className="strategic-directions">
+                        <span className="strategic-label">
+                          Strategic Direction
+                        </span>
+                        <div className="strategic-tags">
+                          {strategicDirections.map((d, i) => (
+                            <span key={i} className="strategic-tag">
+                              {d}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
 
-            {/* ── Results ────────────────────────────────────── */}
-            {result && report && (
-                <div className="results-section fade-in-up">
-
-                    {!hasSignals && (pipelineNotice || report.executive_summary) && (
-                        <div className="card pipeline-notice-card fade-in">
-                            <HiOutlineExclamationCircle className="notice-icon" />
-                            <div>
-                                <h3>No verified signals in this window</h3>
-                                <p>{report.executive_summary}</p>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="card result-header-card">
-                        <div className="result-header-row">
-                            <div className="result-meta">
-                                <h2>{report.company_name || company}</h2>
-                                <div className="result-badges">
-                                    {fromCache && (
-                                        <span className="badge badge-success">Cached</span>
-                                    )}
-                                    <span className="badge badge-accent">{report.total_features_verified || report.features?.length || 0} Signals</span>
-                                    <span className="badge badge-info">{report.total_sources_analysed || 0} Sources</span>
-                                    {distribution.length > 0 && <span className="badge badge-purple">{distribution.length} Themes</span>}
-                                    {report.generated_at && (
-                                        <span className="badge badge-warning">{formatDateTime(report.generated_at)}</span>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="result-header-actions">
-                                <button
-                                    className="btn btn-pdf"
-                                    onClick={handleDownloadPDF}
-                                    disabled={pdfLoading || loading}
-                                    title="Download report as PDF"
-                                    id="download-pdf-btn"
-                                    type="button"
-                                >
-                                    {pdfLoading ? (
-                                        <><span className="spinner spinner-sm" /> Generating…</>
-                                    ) : (
-                                        <><HiOutlineDownload /> Download PDF</>
-                                    )}
-                                </button>
-                                <button
-                                    className="btn btn-report-assistant-jump"
-                                    type="button"
-                                    onClick={scrollToReportAssistant}
-                                    title="Jump to Report Assistant chat below"
-                                >
-                                    <HiOutlineChatAlt2 />
-                                    Report Assistant
-                                </button>
-                            </div>
-                        </div>
+                {distribution.length > 0 && (
+                  <div className="card distribution-card">
+                    <div className="distribution-label">
+                      Signal Distribution
                     </div>
-
-                        {(report.executive_summary || distribution.length > 0) && (
-                            <div className="insight-grid fade-in-up">
-                                {report.executive_summary && (
-                                    <div className="card card-accent executive-card">
-                                        <div className="executive-label">Executive Insight</div>
-                                        <p className="executive-text">{report.executive_summary}</p>
-                                        <div className="executive-stats">
-                                            <div className="exec-stat">
-                                                <span className="exec-stat-value">{report.features?.length || 0}</span>
-                                                <span className="exec-stat-label">Signals</span>
-                                            </div>
-                                            <div className="exec-stat">
-                                                <span className="exec-stat-value">{report.total_sources_analysed || 0}</span>
-                                                <span className="exec-stat-label">Sources</span>
-                                            </div>
-                                            <div className="exec-stat">
-                                                <span className={`exec-stat-value ${avgConfidence >= 0.7 ? 'text-success' : avgConfidence >= 0.4 ? 'text-warning' : 'text-error'}`}>
-                                                    {(avgConfidence * 100).toFixed(0)}%
-                                                </span>
-                                                <span className="exec-stat-label">Avg Confidence</span>
-                                            </div>
-                                        </div>
-                                        {strategicDirections.length > 0 && (
-                                            <div className="strategic-directions">
-                                                <span className="strategic-label">Strategic Direction</span>
-                                                <div className="strategic-tags">
-                                                    {strategicDirections.map((d, i) => (
-                                                        <span key={i} className="strategic-tag">{d}</span>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                {distribution.length > 0 && (
-                                    <div className="card distribution-card">
-                                        <div className="distribution-label">Signal Distribution</div>
-                                        <div className="distribution-bars">
-                                            {distribution.map((d, i) => (
-                                                <div key={i} className="dist-row">
-                                                    <span className={`dist-cat insight-tag ${d.tag}`}>{d.category}</span>
-                                                    <div className="dist-bar-track">
-                                                        <div
-                                                            className={`dist-bar-fill tag-${d.tag}`}
-                                                            style={{ width: `${d.pct}%` }}
-                                                        />
-                                                    </div>
-                                                    <span className="dist-count">{d.count}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className="dist-confidence">
-                                            <div className="dist-conf-header">
-                                                <span className="dist-conf-label">Avg Confidence</span>
-                                                <span className={`dist-conf-value ${avgConfidence >= 0.7 ? 'high' : avgConfidence >= 0.4 ? 'mid' : 'low'}`}>
-                                                    {(avgConfidence * 100).toFixed(0)}%
-                                                </span>
-                                            </div>
-                                            <div className="dist-conf-track">
-                                                <div
-                                                    className={`dist-conf-fill ${avgConfidence >= 0.7 ? 'high' : avgConfidence >= 0.4 ? 'mid' : 'low'}`}
-                                                    style={{ width: `${(avgConfidence * 100).toFixed(0)}%` }}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {report.features?.length > 0 && (
-                            <div className="filter-bar fade-in-up">
-                                <div className="filter-controls">
-                                    <div className="filter-group">
-                                        <HiOutlineFilter className="filter-icon" />
-                                        <select
-                                            className="filter-select"
-                                            value={filterCategory}
-                                            onChange={e => setFilterCategory(e.target.value)}
-                                        >
-                                            <option value="all">All Themes</option>
-                                            {allCategories.map(c => (
-                                                <option key={c} value={c}>{c}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="filter-group">
-                                        <select
-                                            className="filter-select"
-                                            value={filterConfidence}
-                                            onChange={e => setFilterConfidence(e.target.value)}
-                                        >
-                                            <option value="all">All Confidence</option>
-                                            <option value="high">High (≥70%)</option>
-                                            <option value="mid">Medium (40-69%)</option>
-                                            <option value="low">Low (&lt;40%)</option>
-                                        </select>
-                                    </div>
-                                    <div className="filter-group">
-                                        <HiOutlineSortDescending className="filter-icon" />
-                                        <select
-                                            className="filter-select"
-                                            value={sortBy}
-                                            onChange={e => setSortBy(e.target.value)}
-                                        >
-                                            <option value="confidence">Sort: Confidence ↓</option>
-                                            <option value="category">Sort: Category</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <span className="filter-count">
-                                    Showing {filteredSignals.length} of {report.features.length} signals
-                                </span>
-                            </div>
-                        )}
-
-                        {filteredSignals.length > 0 && (
-                            <div className="signals-section">
-                                <div className="signals-list stagger">
-                                    {filteredSignals.map((f, i) => (
-                                        <SignalCard
-                                            key={`${f.title}-${i}`}
-                                            signal={f}
-                                            index={i}
-                                            isExpanded={expandedSignals.has(i)}
-                                            onToggle={() => toggleSignal(i)}
-                                            onAsk={() => {
-                                                setAssistantAutoOpen(true);
-                                                scrollToReportAssistant();
-                                            }}
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {filteredSignals.length === 0 && report.features?.length > 0 && (
-                            <div className="card empty-state">
-                                <div className="icon">🔍</div>
-                                <h3>No signals match your filters</h3>
-                                <p>Try adjusting the category or confidence filters above.</p>
-                            </div>
-                        )}
-
-                    {report.all_sources && report.all_sources.length > 0 && (
-                        <div className="card evidence-section fade-in-up">
-                            <button
-                                className="evidence-toggle"
-                                onClick={() => setSourcesExpanded(!sourcesExpanded)}
-                            >
-                                <span>
-                                    Evidence Layer
-                                    <span className="evidence-count">{report.all_sources.length} sources</span>
-                                </span>
-                                {sourcesExpanded ? <HiOutlineChevronUp /> : <HiOutlineChevronDown />}
-                            </button>
-                            {sourcesExpanded && (
-                                <div className="evidence-list fade-in">
-                                    {report.all_sources.map((url, i) => (
-                                        <a
-                                            key={i}
-                                            href={url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="evidence-item"
-                                        >
-                                            <HiOutlineExternalLink className="evidence-link-icon" />
-                                            <span>{url.length > 90 ? url.slice(0, 90) + '...' : url}</span>
-                                        </a>
-                                    ))}
-                                </div>
-                            )}
+                    <div className="distribution-bars">
+                      {distribution.map((d, i) => (
+                        <div key={i} className="dist-row">
+                          <span className={`dist-cat insight-tag ${d.tag}`}>
+                            {d.category}
+                          </span>
+                          <div className="dist-bar-track">
+                            <div
+                              className={`dist-bar-fill tag-${d.tag}`}
+                              style={{ width: `${d.pct}%` }}
+                            />
+                          </div>
+                          <span className="dist-count">{d.count}</span>
                         </div>
-                    )}
-
-                    {/* ── Report Assistant (inline RAG chat) ─────── */}
-                    <div
-                        id="report-assistant-section"
-                        ref={reportAssistantRef}
-                        className="report-assistant-anchor"
-                    >
-                        <ReportAssistant report={report} companyName={company} autoOpen={assistantAutoOpen} />
+                      ))}
                     </div>
-                </div>
+                    <div className="dist-confidence">
+                      <div className="dist-conf-header">
+                        <span className="dist-conf-label">Avg Confidence</span>
+                        <span
+                          className={`dist-conf-value ${
+                            avgConfidence >= 0.7
+                              ? "high"
+                              : avgConfidence >= 0.4
+                              ? "mid"
+                              : "low"
+                          }`}
+                        >
+                          {(avgConfidence * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                      <div className="dist-conf-track">
+                        <div
+                          className={`dist-conf-fill ${
+                            avgConfidence >= 0.7
+                              ? "high"
+                              : avgConfidence >= 0.4
+                              ? "mid"
+                              : "low"
+                          }`}
+                          style={{
+                            width: `${(avgConfidence * 100).toFixed(0)}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
+
+            {report.features?.length > 0 && (
+              <div className="filter-bar fade-in-up">
+                <div className="filter-controls">
+                  <div className="filter-group">
+                    <HiOutlineFilter className="filter-icon" />
+                    <select
+                      className="filter-select"
+                      value={filterCategory}
+                      onChange={(e) => setFilterCategory(e.target.value)}
+                    >
+                      <option value="all">All Themes</option>
+                      {allCategories.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="filter-group">
+                    <select
+                      className="filter-select"
+                      value={filterConfidence}
+                      onChange={(e) => setFilterConfidence(e.target.value)}
+                    >
+                      <option value="all">All Confidence</option>
+                      <option value="high">High (≥70%)</option>
+                      <option value="mid">Medium (40-69%)</option>
+                      <option value="low">Low (&lt;40%)</option>
+                    </select>
+                  </div>
+                  <div className="filter-group">
+                    <HiOutlineSortDescending className="filter-icon" />
+                    <select
+                      className="filter-select"
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                    >
+                      <option value="confidence">Sort: Confidence ↓</option>
+                      <option value="category">Sort: Category</option>
+                    </select>
+                  </div>
+                </div>
+                <span className="filter-count">
+                  Showing {filteredSignals.length} of {report.features.length}{" "}
+                  signals
+                </span>
+              </div>
+            )}
+
+            {filteredSignals.length > 0 && (
+              <div className="signals-section">
+                <div className="signals-list stagger">
+                  {filteredSignals.map((f, i) => (
+                    <SignalCard
+                      key={`${f.title}-${i}`}
+                      signal={f}
+                      index={i}
+                      isExpanded={expandedSignals.has(i)}
+                      onToggle={() => toggleSignal(i)}
+                      onAsk={() => {
+                        setAssistantAutoOpen(true);
+                        scrollToReportAssistant();
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {filteredSignals.length === 0 && report.features?.length > 0 && (
+              <div className="card empty-state">
+                <div className="icon">🔍</div>
+                <h3>No signals match your filters</h3>
+                <p>Try adjusting the category or confidence filters above.</p>
+              </div>
+            )}
+
+            {report.all_sources && report.all_sources.length > 0 && (
+              <div className="card evidence-section fade-in-up">
+                <button
+                  className="evidence-toggle"
+                  onClick={() => setSourcesExpanded(!sourcesExpanded)}
+                >
+                  <span>
+                    Evidence Layer
+                    <span className="evidence-count">
+                      {report.all_sources.length} sources
+                    </span>
+                  </span>
+                  {sourcesExpanded ? (
+                    <HiOutlineChevronUp />
+                  ) : (
+                    <HiOutlineChevronDown />
+                  )}
+                </button>
+                {sourcesExpanded && (
+                  <div className="evidence-list fade-in">
+                    {report.all_sources.map((url, i) => (
+                      <a
+                        key={i}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="evidence-item"
+                      >
+                        <HiOutlineExternalLink className="evidence-link-icon" />
+                        <span>
+                          {url.length > 90 ? url.slice(0, 90) + "..." : url}
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Report Assistant (inline RAG chat) ─────── */}
+            <div
+              id="report-assistant-section"
+              ref={reportAssistantRef}
+              className="report-assistant-anchor"
+            >
+              <ReportAssistant
+                report={report}
+                companyName={company}
+                autoOpen={assistantAutoOpen}
+              />
             </div>
-        </div>
-    );
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /* ── Signal Card ────────────────────────────────────────────────── */
 function SignalCard({ signal, index, isExpanded, onToggle, onAsk }) {
-    const score = signal.confidence_score ?? signal.confidence;
-    const pct = score != null ? Math.round(score * 100) : null;
-    const level = score >= 0.7 ? 'high' : score >= 0.4 ? 'mid' : 'low';
-    const tag = getCategoryTag(signal.category);
+  const score = signal.confidence_score ?? signal.confidence;
+  const pct = score != null ? Math.round(score * 100) : null;
+  const level = score >= 0.7 ? "high" : score >= 0.4 ? "mid" : "low";
+  const tag = getCategoryTag(signal.category);
 
-    return (
-        <div className={`signal-card ${isExpanded ? 'expanded' : ''} fade-in-up`}>
-            <div className="signal-header" onClick={onToggle}>
-                <div className="signal-rank">{signal.rank || index + 1}</div>
-                <div className="signal-title-area">
-                    <h4>{signal.title || signal.feature_title || 'Untitled Signal'}</h4>
-                </div>
-                <span className={`insight-tag ${tag}`}>{signal.category || 'General'}</span>
-                {pct != null && (
-                    <div className="confidence-bar">
-                        <div className="confidence-bar-track">
-                            <div
-                                className={`confidence-bar-fill ${level}`}
-                                style={{ width: `${pct}%` }}
-                            />
-                        </div>
-                        <span className={`confidence-label ${level}`}>{pct}%</span>
-                    </div>
-                )}
-                <button className="signal-toggle-btn" onClick={(e) => { e.stopPropagation(); onToggle(); }}>
-                    {isExpanded ? <HiOutlineChevronUp /> : <HiOutlineChevronDown />}
-                </button>
-            </div>
-
-            {isExpanded && (
-                <div className="signal-expanded fade-in">
-                    {(signal.description || signal.feature_summary) && (
-                        <p className="signal-description">
-                            {signal.description || signal.feature_summary}
-                        </p>
-                    )}
-                    {signal.impact_assessment && (
-                        <div className="signal-impact">
-                            <span className="impact-label">Impact</span>
-                            <span className="impact-text">{signal.impact_assessment}</span>
-                        </div>
-                    )}
-                    <div className="signal-footer">
-                        {signal.key_metrics && signal.key_metrics.length > 0 && (
-                            <div className="signal-metrics">
-                                {signal.key_metrics.map((m, j) => (
-                                    <span key={j} className="metric-chip">{m}</span>
-                                ))}
-                            </div>
-                        )}
-                        {signal.source_count && (
-                            <span className="signal-meta">{signal.source_count} source{signal.source_count > 1 ? 's' : ''}</span>
-                        )}
-                        {/* Ask AI about this signal */}
-                        <button
-                            className="signal-ask-ai-btn"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onAsk(`Tell me more about: ${signal.title || signal.feature_title}`);
-                            }}
-                        >
-                            <HiOutlineSparkles /> Ask AI
-                        </button>
-                        {signal.source_url && (
-                            <a
-                                href={signal.source_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="signal-source-link"
-                            >
-                                <HiOutlineExternalLink /> Source
-                            </a>
-                        )}
-                    </div>
-                </div>
-            )}
+  return (
+    <div className={`signal-card ${isExpanded ? "expanded" : ""} fade-in-up`}>
+      <div className="signal-header" onClick={onToggle}>
+        <div className="signal-rank">{signal.rank || index + 1}</div>
+        <div className="signal-title-area">
+          <h4>{signal.title || signal.feature_title || "Untitled Signal"}</h4>
         </div>
-    );
+        <span className={`insight-tag ${tag}`}>
+          {signal.category || "General"}
+        </span>
+        {pct != null && (
+          <div className="confidence-bar">
+            <div className="confidence-bar-track">
+              <div
+                className={`confidence-bar-fill ${level}`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <span className={`confidence-label ${level}`}>{pct}%</span>
+          </div>
+        )}
+        <button
+          className="signal-toggle-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle();
+          }}
+        >
+          {isExpanded ? <HiOutlineChevronUp /> : <HiOutlineChevronDown />}
+        </button>
+      </div>
+
+      {isExpanded && (
+        <div className="signal-expanded fade-in">
+          {(signal.description || signal.feature_summary) && (
+            <p className="signal-description">
+              {signal.description || signal.feature_summary}
+            </p>
+          )}
+          {signal.impact_assessment && (
+            <div className="signal-impact">
+              <span className="impact-label">Impact</span>
+              <span className="impact-text">{signal.impact_assessment}</span>
+            </div>
+          )}
+          <div className="signal-footer">
+            {signal.key_metrics && signal.key_metrics.length > 0 && (
+              <div className="signal-metrics">
+                {signal.key_metrics.map((m, j) => (
+                  <span key={j} className="metric-chip">
+                    {m}
+                  </span>
+                ))}
+              </div>
+            )}
+            {signal.source_count && (
+              <span className="signal-meta">
+                {signal.source_count} source{signal.source_count > 1 ? "s" : ""}
+              </span>
+            )}
+            {/* Ask AI about this signal */}
+            <button
+              className="signal-ask-ai-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAsk(
+                  `Tell me more about: ${signal.title || signal.feature_title}`
+                );
+              }}
+            >
+              <HiOutlineSparkles /> Ask AI
+            </button>
+            {signal.source_url && (
+              <a
+                href={signal.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="signal-source-link"
+              >
+                <HiOutlineExternalLink /> Source
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* ── Pipeline Animation — driven by Celery task progress polling ── */
-function PipelineAnimation({ company, activeStage, completedStages, stageLatencies, elapsed }) {
-    const formatTime = (s) => {
-        const m = Math.floor(s / 60);
-        const sec = s % 60;
-        return `${m}:${sec.toString().padStart(2, '0')}`;
-    };
+function PipelineAnimation({
+  company,
+  activeStage,
+  completedStages,
+  stageLatencies,
+  elapsed,
+}) {
+  const formatTime = (s) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  };
 
-    const doneCount = completedStages?.size || 0;
-    const progress = (doneCount / PIPELINE_STAGES.length) * 100;
+  const doneCount = completedStages?.size || 0;
+  const progress = (doneCount / PIPELINE_STAGES.length) * 100;
 
-    return (
-        <div className="card pipeline-anim-card fade-in">
-            <div className="pipeline-anim-header">
-                <div>
-                    <h3>Analyzing <strong>{company}</strong></h3>
-                    <p className="pipeline-anim-stage">
-                        {activeStage >= 0 && activeStage < PIPELINE_STAGES.length ? (
-                            <>Stage {activeStage + 1} of {PIPELINE_STAGES.length} — <span className="pipeline-active-name">{PIPELINE_STAGES[activeStage]}</span></>
-                        ) : activeStage >= PIPELINE_STAGES.length ? (
-                            <span className="pipeline-active-name">Complete ✓</span>
-                        ) : (
-                            <span>Initializing pipeline…</span>
-                        )}
-                    </p>
-                    <p className="pipeline-anim-sub">Real-time progress from backend</p>
-                </div>
-                <div className="pipeline-anim-timer">
-                    <span className="timer-value">{formatTime(elapsed)}</span>
-                    <span className="timer-label">Elapsed</span>
-                </div>
-            </div>
-
-            <div className="pipeline-flow">
-                {PIPELINE_STAGES.map((stage, i) => {
-                    const isDone = completedStages?.has(i);
-                    const isActive = i === activeStage;
-                    const state = isDone ? 'done' : isActive ? 'active' : 'pending';
-                    const latency = stageLatencies?.[i];
-
-                    return (
-                        <div key={i} className="pipeline-flow-item">
-                            <div className={`flow-node ${state}`}>
-                                {isDone ? (
-                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                                        <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                ) : (
-                                    <span className="flow-node-num">{i + 1}</span>
-                                )}
-                            </div>
-                            <span className={`flow-label ${state}`}>{stage}</span>
-                            {isDone && latency != null && (
-                                <span className="flow-latency">{latency.toFixed(1)}s</span>
-                            )}
-                            {i < PIPELINE_STAGES.length - 1 && (
-                                <div className={`flow-connector ${isDone ? 'done' : ''}`} />
-                            )}
-                        </div>
-                    );
-                })}
-            </div>
-
-            <div className="pipeline-anim-bar">
-                <div className="pipeline-anim-bar-fill" style={{ width: `${progress}%` }} />
-            </div>
+  return (
+    <div className="card pipeline-anim-card fade-in">
+      <div className="pipeline-anim-header">
+        <div>
+          <h3>
+            Analyzing <strong>{company}</strong>
+          </h3>
+          <p className="pipeline-anim-stage">
+            {activeStage >= 0 && activeStage < PIPELINE_STAGES.length ? (
+              <>
+                Stage {activeStage + 1} of {PIPELINE_STAGES.length} —{" "}
+                <span className="pipeline-active-name">
+                  {PIPELINE_STAGES[activeStage]}
+                </span>
+              </>
+            ) : activeStage >= PIPELINE_STAGES.length ? (
+              <span className="pipeline-active-name">Complete ✓</span>
+            ) : (
+              <span>Initializing pipeline…</span>
+            )}
+          </p>
+          <p className="pipeline-anim-sub">Real-time progress from backend</p>
         </div>
-    );
+        <div className="pipeline-anim-timer">
+          <span className="timer-value">{formatTime(elapsed)}</span>
+          <span className="timer-label">Elapsed</span>
+        </div>
+      </div>
+
+      <div className="pipeline-flow">
+        {PIPELINE_STAGES.map((stage, i) => {
+          const isDone = completedStages?.has(i);
+          const isActive = i === activeStage;
+          const state = isDone ? "done" : isActive ? "active" : "pending";
+          const latency = stageLatencies?.[i];
+
+          return (
+            <div key={i} className="pipeline-flow-item">
+              <div className={`flow-node ${state}`}>
+                {isDone ? (
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <path
+                      d="M2 6L5 9L10 3"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ) : (
+                  <span className="flow-node-num">{i + 1}</span>
+                )}
+              </div>
+              <span className={`flow-label ${state}`}>{stage}</span>
+              {isDone && latency != null && (
+                <span className="flow-latency">{latency.toFixed(1)}s</span>
+              )}
+              {i < PIPELINE_STAGES.length - 1 && (
+                <div className={`flow-connector ${isDone ? "done" : ""}`} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="pipeline-anim-bar">
+        <div
+          className="pipeline-anim-bar-fill"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+    </div>
+  );
 }

@@ -140,6 +140,21 @@ code {
 }
 
 /* ── Scrollbar ────────────────────────────────────────────────── */
+
+/* Common header styles */
+.common-header {
+  padding: 16px; /* Adjust padding as needed */
+  background-color: #ffffff; /* Light background for the header */
+  border: 1px solid #e0e0e0; /* Light border around the header */
+  border-radius: 4px; /* Optional: Add slight rounding to corners */
+  font-size: 1.2rem; /* Adjust font size as needed */
+  font-weight: 600; /* Make the text slightly bold */
+  color: #333333; /* Text color */
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Adjust content alignment */
+  margin-bottom: 16px; /* Add spacing below the header */
+}
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -352,25 +367,34 @@ a:hover {
 .app-body {
   display: flex;
   flex: 1;
+
   width: 100%;
   max-width: 100%;
-  padding-top: var(--header-height);
+
+  padding-top: calc(var(--header-height) - 24px);
+
+  background:
+    radial-gradient(circle at top left,
+      rgba(124, 58, 237, 0.06),
+      transparent 28%),
+    radial-gradient(circle at top right,
+      rgba(99, 102, 241, 0.05),
+      transparent 24%),
+    #f4f7f6;
+
+  min-height: 100vh;
 }
 
 .main-content {
   flex: 1;
-  margin-left: var(--sidebar-width);
-  padding: 36px 44px;
+  margin-left: calc(var(--sidebar-width) + 16px); /* Add extra space next to the sidebar */
+  padding: 18px 32px 32px 32px;
   min-height: calc(100vh - var(--header-height));
   min-height: calc(100dvh - var(--header-height));
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0)) 0 0 / 100% 260px no-repeat,
-    var(--bg-primary);
 }
-
 
 /* ═══════════════════════════════════════════════════════════════════
    TOP BAR — Brand + Bell + Avatar
@@ -863,26 +887,144 @@ a:hover {
 /* ═══════════════════════════════════════════════════════════════════
    PAGE HEADER — Typography Hierarchy
    ═══════════════════════════════════════════════════════════════════ */
+   .page-header {
+    position: relative;
 
-.page-header {
-  margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 16px;
+
+    overflow: hidden;
+
+    padding: 16px 22px;
+
+    border-radius: 24px;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(255,255,255,0.96),
+            rgba(255,255,255,0.92)
+        );
+
+    border: 1px solid rgba(226,232,240,0.8);
+
+    box-shadow:
+        0 4px 10px rgba(15,23,42,0.03),
+        0 10px 24px rgba(15,23,42,0.05);
+
+    backdrop-filter: blur(10px);
+
+    margin-bottom: 12px;
 }
 
+.page-header-content {
+  display: flex;
+  flex-direction: column;
+
+  min-width: 0;
+
+  flex: 1;
+}
+
+.page-header-icon {
+  width: 48px;
+  height: 48px;
+
+  flex-shrink: 0;
+
+  border-radius: 16px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background:
+      linear-gradient(
+          135deg,
+          rgba(124,58,237,0.10),
+          rgba(99,102,241,0.08)
+      );
+
+  border: 1px solid rgba(124,58,237,0.10);
+
+  color: #16a34a;
+
+  font-size: 1.25rem;
+
+  box-shadow:
+      0 6px 18px rgba(124,58,237,0.08);
+}
+
+.page-header::before {
+  content: "";
+
+  position: absolute;
+
+  top: -80px;
+  right: -80px;
+
+  width: 220px;
+  height: 220px;
+
+  border-radius: 50%;
+
+  background:
+      radial-gradient(
+          circle,
+          rgba(46,125,50,0.10),
+          transparent 70%
+      );
+
+  pointer-events: none;
+}
+
+
+
 .page-header h1 {
-  font-size: 1.95rem;
-  font-weight: 800;
-  color: var(--text-primary);
-  margin-bottom: 8px;
-  letter-spacing: -0.03em;
-  line-height: 1.2;
+  font-size: 2.2rem;
+
+  font-weight: 900;
+
+  color: #111827;
+
+  margin-bottom: 10px;
+
+  letter-spacing: -0.04em;
+
+  line-height: 1.1;
+}
+
+.page-header h2 {
+  font-size: 2rem;
+
+  font-weight: 900;
+
+  color: #111827;
+
+  line-height: 1.05;
+
+  letter-spacing: -0.04em;
+
+  margin: 0;
 }
 
 .page-header p {
-  color: var(--text-muted);
-  font-size: 0.98rem;
-  line-height: 1.6;
-  max-width: 680px;
+  margin-top: 6px;
+
+  font-size: 0.96rem;
+
+  font-weight: 500;
+
+  color: #64748B;
+
+  line-height: 1.5;
+
+  max-width: 760px;
 }
+
 
 .page-header .subtitle {
   font-size: 1rem;
@@ -1189,7 +1331,7 @@ a:hover {
   }
 
   .app-body {
-    padding-top: var(--header-height);
+    padding-top: calc(var(--header-height) - 18px);
   }
 
   .topbar {
