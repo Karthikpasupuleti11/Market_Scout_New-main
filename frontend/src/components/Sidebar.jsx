@@ -27,12 +27,12 @@ const SECONDARY_NAV = [
     { path: '/schedule', label: 'Automation', icon: <HiOutlineClock /> },
 ];
 
-const FLOWER_URL = import.meta.env.VITE_FLOWER_URL || 'http://localhost:5555';
+const FLOWER_URL = import.meta.env.VITE_FLOWER_URL || 'http://flower.market-scout.me';
 
 const EXTERNAL_LINKS = [
-    { href: 'http://localhost:8000/docs',  label: 'API Docs',   icon: <HiOutlineChartBar /> },
-    { href: 'http://localhost:9090',       label: 'Prometheus', icon: <SiPrometheus /> },
-    { href: 'http://localhost:3000',       label: 'Grafana',    icon: <SiGrafana /> },
+    { href: 'http://api.market-scout.me/docs',  label: 'API Docs',   icon: <HiOutlineChartBar /> },
+    { href: 'http://metrics.market-scout.me',       label: 'Prometheus', icon: <SiPrometheus /> },
+    { href: 'http://grafana.market-scout.me',       label: 'Grafana',    icon: <SiGrafana /> },
     { href: FLOWER_URL,                    label: 'Flower Tasks',     icon: <HiOutlineLightningBolt /> },
 ];
 
