@@ -107,7 +107,8 @@ export async function deleteSchedule(jobId) {
 
 // 🔹 RAG: Index Report
 export async function indexReport(report) {
-    const sessionId = `rag_${report.company_name.replace(/\s+/g, '_').toLowerCase()}`;
+    const name = report.company_name || report.competitor_name || 'default';
+    const sessionId = `rag_${name.replace(/\s+/g, '_').toLowerCase()}`;
     const res = await fetch(`${API_BASE}/rag/index`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -125,7 +126,8 @@ export async function indexReport(report) {
 
 // 🔹 RAG: Ask Question
 export async function askRagQuestion(query, companyName) {
-    const sessionId = `rag_${companyName.replace(/\s+/g, '_').toLowerCase()}`;
+    const name = companyName || 'default';
+    const sessionId = `rag_${name.replace(/\s+/g, '_').toLowerCase()}`;
     const res = await fetch(`${API_BASE}/rag/ask?query=${encodeURIComponent(query)}`, {
         headers: { 'X-Session-Id': sessionId },
     });

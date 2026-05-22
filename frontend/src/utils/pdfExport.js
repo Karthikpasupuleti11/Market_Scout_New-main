@@ -243,7 +243,7 @@ export function generateReportPDF(report, companyFallback = '') {
 
             // Category pill
             if (category) {
-                fill(doc, [224, 231, 255]);
+                fill(doc, COLORS.brandSoft);
                 stroke(doc, COLORS.bannerBorder);
                 doc.setLineWidth(0.2);
                 const tw = MARGIN + 12;

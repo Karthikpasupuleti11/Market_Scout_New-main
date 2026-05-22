@@ -38,6 +38,10 @@ def run_scheduled_job(job_id: int, company_name: str, email: str, db_factory, gr
         if not report:
             raise RuntimeError("Pipeline produced no synthesis report.")
 
+        features = report.get("features", [])
+        if not features:
+            raise RuntimeError(f"No features extracted for '{company_name}'. Report not saved.")
+
         # ── 3. Save to DB ────────────────────────────────────────────
         saved_report = crud.save_report(db, company_name, report)
 

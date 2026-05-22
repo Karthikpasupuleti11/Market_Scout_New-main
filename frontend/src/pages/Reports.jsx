@@ -62,7 +62,9 @@ export default function Reports() {
     setSearched(true);
     try {
       const data = await getReports(company.trim());
-      setReports(Array.isArray(data) ? data : [data]);
+      const reportsArr = Array.isArray(data) ? data : [data];
+      // Inject company_name so ReportAssistant RAG can build a session ID
+      setReports(reportsArr.map(r => ({ ...r, company_name: company.trim() })));
     } catch {
       setReports([]);
     } finally {
@@ -82,7 +84,8 @@ export default function Reports() {
         setSearched(true);
         try {
           const data = await getReports(auto.trim());
-          setReports(Array.isArray(data) ? data : [data]);
+          const reportsArr = Array.isArray(data) ? data : [data];
+          setReports(reportsArr.map(r => ({ ...r, company_name: auto.trim() })));
         } catch {
           setReports([]);
         } finally {

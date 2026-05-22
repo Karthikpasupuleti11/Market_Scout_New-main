@@ -75,7 +75,7 @@ const ReportAssistant = forwardRef(({ report }, ref) => {
         setLoading(true);
 
         try {
-            const res = await askRagQuestion(userMsg, report.company_name);
+            const res = await askRagQuestion(userMsg, report.company_name || report.competitor_name);
             setMessages(prev => [...prev, { role: 'assistant', content: cleanMarkdown(res.answer) }]);
         } catch (err) {
             setMessages(prev => [...prev, { 

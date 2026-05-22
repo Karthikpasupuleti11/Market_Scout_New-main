@@ -119,18 +119,21 @@ def run_market_pipeline(self, company_name, date_window_days, session_id):
 
 
 
-    # ── Save DB ─────────────────────────────
-    try:
-        db = next(get_db())
-        crud.save_report(db, company_name, report)
-    except Exception as e:
-        print("DB save failed:", e)
+    # ── Save DB + Cache (only if pipeline produced actual features) ──
+    if safe_features:
+        try:
+            db = next(get_db())
+            crud.save_report(db, company_name, report)
+        except Exception as e:
+            print("DB save failed:", e)
 
-    # ── Warm the report cache (L1) ─────────────────────
-    try:
-        from cache.report_cache import set_report_in_redis
-        set_report_in_redis(company_name, date_window_days, response)
-    except Exception as e:
-        print("Report cache warming failed:", e)
+        # ── Warm the report cache (L1) ─────────────────────
+        try:
+            from cache.report_cache import set_report_in_redis
+            set_report_in_redis(company_name, date_window_days, response)
+        except Exception as e:
+            print("Report cache warming failed:", e)
+    else:
+        print(f"SKIP SAVE — No features extracted for '{company_name}', not saving empty report to DB or cache.")
 
     return response

@@ -162,8 +162,8 @@ def _build_html(report: dict, company: str) -> str:
     <tr><td align="center">
 
       <!-- Email Container -->
-      <table role="presentation" class="email-container" width="640" cellpadding="0" cellspacing="0" border="0"
-             style="max-width:640px;width:100%;background:#ffffff;border-radius:16px;
+      <table role="presentation" class="email-container" width="800" cellpadding="0" cellspacing="0" border="0"
+             style="max-width:800px;width:100%;background:#ffffff;border-radius:16px;
                     overflow:hidden;box-shadow:0 4px 30px rgba(0,0,0,0.08);">
 
         <!-- ═══ HEADER ═══ -->
