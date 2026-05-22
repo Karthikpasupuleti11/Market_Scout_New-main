@@ -1,4 +1,4 @@
-name: Deploy to Azure VM
+name: Deploy
 
 on:
   push:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy via SSH
+      - name: Deploy to VM
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.HOST }}
@@ -18,8 +18,5 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             cd ~/Market_Scout_New-main
-
             git pull origin main
-
-            docker compose down
             docker compose up -d --build
