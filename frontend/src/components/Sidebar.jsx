@@ -1,169 +1,228 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import {
-    HiOutlineGlobeAlt,
-    HiOutlineLightningBolt,
-    HiOutlineDocumentText,
-    HiOutlineEye,
-    HiOutlineClock,
-    HiOutlineChartBar,
-    HiOutlineCog,
-    HiOutlineMenu,
-    HiOutlineX,
-} from 'react-icons/hi';
-import { SiPrometheus, SiGrafana } from 'react-icons/si';
-import { getHealth } from '../api';
-import { DOCS_URL, PROMETHEUS_URL, GRAFANA_URL, FLOWER_URL } from '../config/urls';
-import SettingsPanel from './SettingsPanel';
-import './Sidebar.css';
+  HiOutlineGlobeAlt,
+  HiOutlineLightningBolt,
+  HiOutlineDocumentText,
+  HiOutlineEye,
+  HiOutlineClock,
+  HiOutlineChartBar,
+  HiOutlineCog,
+  HiOutlineMenu,
+  HiOutlineX,
+} from "react-icons/hi";
+import { SiPrometheus, SiGrafana } from "react-icons/si";
+import { getHealth } from "../api";
+import {
+  DOCS_URL,
+  PROMETHEUS_URL,
+  GRAFANA_URL,
+  FLOWER_URL,
+} from "../config/urls";
+import SettingsPanel from "./SettingsPanel";
+import "./Sidebar.css";
 
 const PRIMARY_NAV = [
-    { path: '/',            label: 'Overview',      icon: <HiOutlineGlobeAlt /> },
-    { path: '/intelligence', label: 'Intelligence',  icon: <HiOutlineLightningBolt /> },
-    { path: '/analysis',    label: 'Analysis',      icon: <HiOutlineChartBar /> },
-    { path: '/reports',     label: 'Reports',       icon: <HiOutlineDocumentText /> },
-    { path: '/watchlist',   label: 'Watchlist',     icon: <HiOutlineEye /> },
+  { path: "/", label: "Overview", icon: <HiOutlineGlobeAlt /> },
+  {
+    path: "/intelligence",
+    label: "Intelligence",
+    icon: <HiOutlineLightningBolt />,
+  },
+  { path: "/analysis", label: "Analysis", icon: <HiOutlineChartBar /> },
+  { path: "/reports", label: "Reports", icon: <HiOutlineDocumentText /> },
+  { path: "/watchlist", label: "Watchlist", icon: <HiOutlineEye /> },
 ];
 
 const SECONDARY_NAV = [
-    { path: '/schedule', label: 'Automation', icon: <HiOutlineClock /> },
+  { path: "/schedule", label: "Automation", icon: <HiOutlineClock /> },
 ];
 
 const EXTERNAL_LINKS = [
-    { href: DOCS_URL, label: 'API Docs', icon: <HiOutlineChartBar /> },
-    { href: PROMETHEUS_URL, label: 'Prometheus', icon: <SiPrometheus /> },
-    { href: GRAFANA_URL, label: 'Grafana', icon: <SiGrafana /> },
-    { href: FLOWER_URL, label: 'Flower Tasks', icon: <HiOutlineLightningBolt /> },
+  { href: DOCS_URL, label: "API Docs", icon: <HiOutlineChartBar /> },
+  { href: PROMETHEUS_URL, label: "Prometheus", icon: <SiPrometheus /> },
+  { href: GRAFANA_URL, label: "Grafana", icon: <SiGrafana /> },
+  { href: FLOWER_URL, label: "Flower Tasks", icon: <HiOutlineLightningBolt /> },
 ];
 
 export default function Sidebar({ mobileOpen = false, onClose }) {
-    const location = useLocation();
-    const [settingsOpen, setSettingsOpen] = useState(false);
-    const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [backendUp, setBackendUp] = useState(null); // null = checking, true = up, false = down
-    const intervalRef = useRef(null);
+  const location = useLocation();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [backendUp, setBackendUp] = useState(null); // null = checking, true = up, false = down
+  const intervalRef = useRef(null);
+  const [collapsed, setCollapsed] = useState(false);
 
-    // Close sidebar on route change (mobile)
-    useEffect(() => {
-        setSidebarOpen(false);
-    }, [location.pathname]);
+  // Close sidebar on route change (mobile)
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
 
-    const toggleSidebar = useCallback(() => setSidebarOpen(prev => !prev), []);
+  useEffect(() => {
+    const appLayout = document.querySelector(".app-layout");
 
-    useEffect(() => {
-        async function check() {
-            try {
-                await getHealth();
-                setBackendUp(true);
-            } catch {
-                setBackendUp(false);
-            }
-        }
-        check();
-        intervalRef.current = setInterval(check, 15000);
-        return () => clearInterval(intervalRef.current);
-    }, []);
+    if (!appLayout) return;
 
-    const statusLabel = backendUp === null ? 'Checking…' : backendUp ? 'System Online' : 'System Offline';
-    const statusClass = backendUp === null ? 'checking' : backendUp ? 'online' : 'offline';
+    if (collapsed) {
+      appLayout.classList.add("sidebar-collapsed");
+    } else {
+      appLayout.classList.remove("sidebar-collapsed");
+    }
 
-    return (
-        <>
-            {/* Hamburger button — visible on mobile only */}
-            <button
-                className="sidebar-hamburger"
-                onClick={toggleSidebar}
-                aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
-            >
-                {sidebarOpen ? <HiOutlineX /> : <HiOutlineMenu />}
-            </button>
+    return () => {
+      appLayout.classList.remove("sidebar-collapsed");
+    };
+  }, [collapsed]);
 
-            {/* Backdrop — visible on mobile when sidebar open */}
-            {sidebarOpen && (
-                <div
-                    className="sidebar-backdrop visible"
-                    onClick={() => setSidebarOpen(false)}
-                />
-            )}
+  const toggleSidebar = useCallback(() => setSidebarOpen((prev) => !prev), []);
 
-            <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+  useEffect(() => {
+    async function check() {
+      try {
+        await getHealth();
+        setBackendUp(true);
+      } catch {
+        setBackendUp(false);
+      }
+    }
+    check();
+    intervalRef.current = setInterval(check, 15000);
+    return () => clearInterval(intervalRef.current);
+  }, []);
 
-                {/* ── Navigation ──────────────────────────────────── */}
-                <nav className="sidebar-nav">
+  const statusLabel =
+    backendUp === null
+      ? "Checking…"
+      : backendUp
+      ? "System Online"
+      : "System Offline";
+  const statusClass =
+    backendUp === null ? "checking" : backendUp ? "online" : "offline";
 
-                    {/* Primary */}
-                    <div className="nav-section">
-                        <span className="nav-section-label">Intelligence</span>
-                        {PRIMARY_NAV.map(item => (
-                            <NavLink
-                                key={item.path}
-                                to={item.path}
-                                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                                end={item.path === '/'}
-                            >
-                                <span className="nav-icon">{item.icon}</span>
-                                <span className="nav-label">{item.label}</span>
-                                {item.path === location.pathname && <span className="nav-indicator" />}
-                            </NavLink>
-                        ))}
-                    </div>
+  return (
+    <>
+      {/* Hamburger button — visible on mobile only */}
+      <button
+        className="sidebar-hamburger"
+        onClick={toggleSidebar}
+        aria-label={sidebarOpen ? "Close menu" : "Open menu"}
+      >
+        {sidebarOpen ? <HiOutlineX /> : <HiOutlineMenu />}
+      </button>
 
-                    {/* Secondary */}
-                    <div className="nav-section">
-                        <span className="nav-section-label">System</span>
-                        {SECONDARY_NAV.map(item => (
-                            <NavLink
-                                key={item.path}
-                                to={item.path}
-                                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                            >
-                                <span className="nav-icon">{item.icon}</span>
-                                <span className="nav-label">{item.label}</span>
-                                {item.path === location.pathname && <span className="nav-indicator" />}
-                            </NavLink>
-                        ))}
-                    </div>
+      {/* Backdrop — visible on mobile when sidebar open */}
+      {sidebarOpen && (
+        <div
+          className="sidebar-backdrop visible"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-                    {/* External */}
-                    <div className="nav-section">
-                        <span className="nav-section-label">External</span>
-                        {EXTERNAL_LINKS.map(link => (
-                            <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer" className="nav-item external">
-                                <span className="nav-icon">{link.icon}</span>
-                                <span className="nav-label">{link.label}</span>
-                                <span className="nav-external-badge">↗</span>
-                            </a>
-                        ))}
-                    </div>
-                </nav>
+      <aside
+        className={`
+    sidebar
+    ${sidebarOpen ? "open" : ""}
+    ${collapsed ? "collapsed" : ""}
+  `}
+      >
+        <div className="sidebar-top">
+  <button
+    className="sidebar-collapse-btn"
+    onClick={() => setCollapsed((prev) => !prev)}
+  >
+    <HiOutlineMenu />
+    {!collapsed && <span>Menu</span>}
+  </button>
+</div>
 
-                {/* ── Settings Button ─────────────────────────────── */}
-                <button
-                    className={`sidebar-settings-btn ${settingsOpen ? 'active' : ''}`}
-                    onClick={() => setSettingsOpen(true)}
-                    aria-label="Open Settings"
-                    id="settings-btn"
-                >
-                    <HiOutlineCog className="settings-gear-icon" />
-                    <span>Settings</span>
-                </button>
+        {/* ── Navigation ──────────────────────────────────── */}
+        <nav className="sidebar-nav">
+          {/* Primary */}
+          <div className="nav-section">
+            <span className="nav-section-label">Intelligence</span>
+            {PRIMARY_NAV.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                className={({ isActive }) =>
+                  `nav-item ${isActive ? "active" : ""}`
+                }
+                end={item.path === "/"}
+              >
+                <span className="nav-icon">{item.icon}</span>
+                <span className="nav-label">{item.label}</span>
+                {item.path === location.pathname && (
+                  <span className="nav-indicator" />
+                )}
+              </NavLink>
+            ))}
+          </div>
 
-                {/* ── Footer ──────────────────────────────────────── */}
-                <div className="sidebar-footer">
-                    <div className={`footer-status ${statusClass}`}>
-                        <span className={`status-dot ${statusClass}`} />
-                        <span>{statusLabel}</span>
-                    </div>
-                    <div className="footer-badge">v2.0</div>
-                </div>
-            </aside>
+          {/* Secondary */}
+          <div className="nav-section">
+            <span className="nav-section-label">System</span>
+            {SECONDARY_NAV.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                className={({ isActive }) =>
+                  `nav-item ${isActive ? "active" : ""}`
+                }
+              >
+                <span className="nav-icon">{item.icon}</span>
+                <span className="nav-label">{item.label}</span>
+                {item.path === location.pathname && (
+                  <span className="nav-indicator" />
+                )}
+              </NavLink>
+            ))}
+          </div>
 
-            {/* Settings Drawer */}
-            <SettingsPanel
-                isOpen={settingsOpen}
-                onClose={() => setSettingsOpen(false)}
-            />
-        </>
-    );
+          {/* External */}
+          <div className="nav-section">
+            <span className="nav-section-label">External</span>
+            {EXTERNAL_LINKS.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="nav-item external"
+              >
+                <span className="nav-icon">{link.icon}</span>
+                <span className="nav-label">{link.label}</span>
+                <span className="nav-external-badge">↗</span>
+              </a>
+            ))}
+          </div>
+        </nav>
+
+        {/* ── Settings Button ─────────────────────────────── */}
+        <button
+          className={`sidebar-settings-btn ${settingsOpen ? "active" : ""}`}
+          onClick={() => setSettingsOpen(true)}
+          aria-label="Open Settings"
+          id="settings-btn"
+        >
+          <HiOutlineCog className="settings-gear-icon" />
+          <span>Settings</span>
+        </button>
+
+        {/* ── Footer ──────────────────────────────────────── */}
+        <div className="sidebar-footer">
+          <div className={`footer-status ${statusClass}`}>
+            <span className={`status-dot ${statusClass}`} />
+            <span>{statusLabel}</span>
+          </div>
+          <div className="footer-badge">v2.0</div>
+        </div>
+      </aside>
+
+      {/* Settings Drawer */}
+      <SettingsPanel
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
+    </>
+  );
 }
-

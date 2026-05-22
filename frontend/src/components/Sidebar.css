@@ -1,4 +1,4 @@
-/* ════════════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════   ══════════════════
    PREMIUM MARKET SCOUT SIDEBAR
    ════════════════════════════════════════════════════════════════ */
 
@@ -63,6 +63,125 @@
     pointer-events: none;
 }
 
+
+.sidebar-top {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    padding: 18px 18px 8px 18px;
+
+    position: relative;
+
+    z-index: 2;
+}
+
+.sidebar-collapse-btn {
+    height: 46px;
+
+    padding: 0 16px;
+
+    border: none;
+
+    border-radius: 16px;
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(255,255,255,0.92),
+            rgba(248,250,252,0.95)
+        );
+
+    border: 1px solid rgba(15,23,42,0.06);
+
+    color: #475569;
+
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    cursor: pointer;
+
+    font-size: 0.95rem;
+    font-weight: 700;
+
+    transition: all 0.25s ease;
+
+    box-shadow:
+        0 6px 18px rgba(15,23,42,0.06);
+}
+
+.sidebar-mini-brand {
+    width: 42px;
+    height: 42px;
+
+    border-radius: 14px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background:
+        linear-gradient(
+            135deg,
+            #16a34a,
+            #15803d
+        );
+
+    color: white;
+
+    font-size: 0.9rem;
+
+    font-weight: 800;
+
+    letter-spacing: 0.04em;
+
+    box-shadow:
+        0 10px 24px rgba(22,163,74,0.22);
+}
+
+
+.sidebar-collapse-btn:hover {
+    background: white;
+
+    color: #16a34a;
+
+    transform: translateY(-2px);
+
+    box-shadow:
+        0 12px 28px rgba(22,163,74,0.12);
+}
+
+.sidebar.collapsed {
+    width: 96px;
+}
+
+.sidebar-collapse-btn svg {
+    font-size: 1.15rem;
+}
+
+.sidebar.collapsed .nav-label,
+.sidebar.collapsed .nav-section-label,
+.sidebar.collapsed .sidebar-settings-btn span,
+.sidebar.collapsed .footer-status span,
+.sidebar.collapsed .footer-badge {
+    opacity: 0;
+
+    visibility: hidden;
+
+    width: 0;
+}
+
+.sidebar.collapsed .nav-item,
+.sidebar.collapsed .sidebar-settings-btn {
+    justify-content: center;
+}
+
+.sidebar.collapsed .nav-indicator {
+    left: 0;
+}
 /* =========================================================
    NAV
    ========================================================= */

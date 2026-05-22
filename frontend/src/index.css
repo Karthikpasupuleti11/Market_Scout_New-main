@@ -67,7 +67,7 @@
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
   /* ── Spacing & Layout ───────────────────────────────────────── */
-  --sidebar-width: 240px;
+  --sidebar-width: 280px;
   --header-height: 76px;
   --radius-xs: 6px;
   --radius-sm: 8px;
@@ -366,34 +366,43 @@ a:hover {
 
 .app-body {
   display: flex;
+
   flex: 1;
 
   width: 100%;
+
   max-width: 100%;
 
-  padding-top: calc(var(--header-height) - 24px);
+  gap: 16px;
 
-  background:
-    radial-gradient(circle at top left,
-      rgba(124, 58, 237, 0.06),
-      transparent 28%),
-    radial-gradient(circle at top right,
-      rgba(99, 102, 241, 0.05),
-      transparent 24%),
-    #f4f7f6;
+  padding:
+    calc(var(--header-height) - 24px)
+    12px
+    12px
+    12px;
 
-  min-height: 100vh;
+  overflow-x: hidden;
 }
 
 .main-content {
   flex: 1;
-  margin-left: calc(var(--sidebar-width) + 16px); /* Add extra space next to the sidebar */
-  padding: 18px 32px 32px 32px;
+
+  margin-left: calc(var(--sidebar-width) + 28px);
+
+  width: calc(100% - (var(--sidebar-width) + 28px));
+
+  max-width: calc(100% - (var(--sidebar-width) + 28px));
+
+  padding: 18px 32px 32px 0;
+
   min-height: calc(100vh - var(--header-height));
   min-height: calc(100dvh - var(--header-height));
-  width: 100%;
-  max-width: 100%;
+
   overflow-x: hidden;
+
+  transition:
+    margin-left 0.35s cubic-bezier(0.4,0,0.2,1),
+    width 0.35s cubic-bezier(0.4,0,0.2,1);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1306,6 +1315,12 @@ a:hover {
   }
 
   .main-content {
+    margin-left: 0;
+  
+    width: 100%;
+  
+    max-width: 100%;
+  
     padding: 24px 20px;
   }
 
@@ -1316,6 +1331,14 @@ a:hover {
   .page-header h1 {
     font-size: 1.6rem;
   }
+}
+
+.app-layout.sidebar-collapsed .main-content {
+  margin-left: 120px;
+
+  width: calc(100% - 120px);
+
+  max-width: calc(100% - 120px);
 }
 
 /* ── Mobile (≤ 768px) — Sidebar collapses ──────────────────────── */
