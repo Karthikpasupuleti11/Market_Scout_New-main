@@ -844,6 +844,15 @@
 
 /* ── Responsive ────────────────────────────────────────────────── */
 
+@media (max-width: 1024px) {
+    .exec-comparison,
+    .strength-grid,
+    .direction-grid,
+    .signals-comparison {
+        grid-template-columns: 1fr;
+    }
+}
+
 @media (max-width: 768px) {
     .analysis-hero-strip {
         grid-template-columns: 1fr;
@@ -859,6 +868,17 @@
 
     .charts-doughnut-row {
         flex-direction: column;
+    }
+}
+
+@media (max-width: 480px) {
+    .analysis-hero-strip {
+        padding: 12px;
+        gap: 8px;
+    }
+
+    .charts-doughnut-row {
+        gap: 16px;
     }
 }
 

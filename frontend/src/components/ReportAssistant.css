@@ -461,3 +461,80 @@
     color: var(--text-primary);
     letter-spacing: 0.5px;
 }
+
+/* ── Responsive ────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+    .ra-body {
+        height: 320px;
+    }
+
+    .ra-messages {
+        padding: 12px;
+        gap: 12px;
+    }
+
+    .ra-bubble {
+        max-width: 90%;
+        padding: 10px 14px;
+        font-size: 0.84rem;
+    }
+
+    .ra-input-bar {
+        padding: 10px 12px;
+    }
+
+    .ra-input-bar input {
+        font-size: 0.875rem;
+        min-height: 42px;
+    }
+
+    .ra-input-bar button {
+        min-width: 42px;
+        min-height: 42px;
+    }
+
+    .ra-suggestions {
+        padding: 8px 12px;
+        gap: 6px;
+    }
+
+    .ra-chip {
+        font-size: 0.72rem;
+        padding: 5px 10px;
+    }
+
+    .ra-toggle {
+        padding: 14px 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .ra-body {
+        height: 280px;
+    }
+
+    .ra-bubble {
+        max-width: 95%;
+        font-size: 0.8rem;
+    }
+
+    .ra-avatar {
+        width: 26px;
+        height: 26px;
+        font-size: 0.7rem;
+    }
+
+    .ra-scanning-container {
+        width: 60px;
+        height: 60px;
+    }
+
+    .ra-scanning-icon {
+        font-size: 1.8rem;
+    }
+
+    .ra-indexing-text {
+        font-size: 0.95rem;
+    }
+}

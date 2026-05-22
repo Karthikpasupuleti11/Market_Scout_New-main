@@ -286,7 +286,55 @@
     .report-search-row {
         flex-direction: column;
     }
+
+    .report-search-btn {
+        width: 100%;
+        min-height: 48px;
+    }
+
     .report-card-header {
         flex-wrap: wrap;
+    }
+
+    .report-actions {
+        width: 100%;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 8px;
+    }
+
+    .report-actions .btn {
+        min-height: 44px;
+    }
+}
+
+@media (max-width: 480px) {
+    .report-search-card {
+        padding: 16px;
+    }
+
+    .report-search-input {
+        height: 48px;
+        font-size: 0.875rem;
+    }
+
+    .report-meta-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .meta-dot {
+        display: none;
+    }
+
+    .report-info h3 {
+        font-size: 0.92rem;
+    }
+
+    .report-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 1rem;
     }
 }

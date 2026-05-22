@@ -246,6 +246,53 @@
     }
 }
 
+@media (max-width: 768px) {
+    .job-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .job-delete-btn {
+        margin-left: 0;
+        align-self: flex-end;
+    }
+
+    .modal-box {
+        padding: 24px;
+        margin: 16px;
+        max-width: calc(100vw - 32px);
+    }
+
+    .modal-actions {
+        flex-direction: column;
+    }
+
+    .modal-actions .btn {
+        width: 100%;
+    }
+
+    .schedule-submit-btn {
+        min-height: 48px;
+    }
+}
+
+@media (max-width: 480px) {
+    .schedule-page .page-header h1 {
+        font-size: 1.3rem;
+    }
+
+    .job-info strong {
+        font-size: 0.9rem;
+    }
+
+    .job-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+}
+
 /* ── Delete Confirmation Modal ──────────────────────────────────── */
 .modal-overlay {
     position: fixed;

@@ -43,6 +43,7 @@ export function PipelineProvider({ children }) {
     const abortControllerRef = useRef(null);
     const stageTimerRef = useRef(null);
     const clockTimerRef = useRef(null);
+    const pollIntervalRef = useRef(null);
 
     // ── Internal: start / stop the animation clocks ──────────────
     const startClocks = useCallback(() => {
@@ -93,6 +94,7 @@ export function PipelineProvider({ children }) {
 
     // ── Poll Task Status (1s for responsive tracking) ──
     const pollInterval = setInterval(async () => {
+    pollIntervalRef.current = pollInterval;
 
         try {
 
@@ -197,10 +199,19 @@ export function PipelineProvider({ children }) {
 
     // ── Public: stop the running pipeline ────────────────────────
     const stopPipeline = useCallback(() => {
+        // Abort the initial HTTP request (if still in flight)
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
         }
-    }, []);
+        // Stop the polling loop
+        if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+        }
+        stopClocks();
+        setLoading(false);
+        setError('Pipeline stopped by user.');
+    }, [stopClocks]);
 
     // ── Public: clear results to start fresh ─────────────────────
     const clearPipeline = useCallback(() => {

@@ -308,3 +308,37 @@
         grid-template-columns: 1fr;
     }
 }
+
+@media (max-width: 480px) {
+    .hero-content h1 {
+        font-size: 1.4rem;
+    }
+
+    .hero-content p {
+        font-size: 0.88rem;
+    }
+
+    .overview-hero-surface {
+        padding: 20px 16px;
+    }
+
+    .pipeline-section {
+        padding: 20px 16px;
+    }
+
+    .pipeline-node {
+        padding: 8px 10px;
+        gap: 8px;
+    }
+
+    .node-number {
+        width: 24px;
+        height: 24px;
+        font-size: 0.65rem;
+    }
+
+    .action-card {
+        padding: 18px;
+        min-height: auto;
+    }
+}

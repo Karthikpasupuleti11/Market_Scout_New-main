@@ -1330,3 +1330,63 @@
         max-height: 420px;
     }
 }
+
+@media (max-width: 480px) {
+    .intel-input-wrapper {
+        width: 100%;
+    }
+
+    .intel-input {
+        font-size: 0.875rem;
+        min-height: 48px;
+    }
+
+    .intel-stop-btn {
+        width: 100%;
+    }
+
+    .pipeline-progress-bar {
+        gap: 4px;
+    }
+
+    .pipeline-stage-dot {
+        width: 22px;
+        height: 22px;
+        font-size: 0.6rem;
+    }
+
+    .pipeline-connector {
+        min-width: 6px;
+    }
+
+    .pipeline-active-name {
+        font-size: 0.8rem;
+    }
+
+    .result-header-card {
+        padding: 16px;
+    }
+
+    .result-header-row {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .result-header-row > div:last-child {
+        width: 100%;
+    }
+
+    .result-header-row .btn {
+        width: 100%;
+        min-height: 44px;
+        justify-content: center;
+    }
+
+    .signal-card {
+        padding: 14px;
+    }
+
+    .insight-grid {
+        gap: 12px;
+    }
+}

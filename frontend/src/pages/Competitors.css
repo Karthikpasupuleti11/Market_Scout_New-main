@@ -280,4 +280,53 @@
     .watchlist-grid {
         grid-template-columns: 1fr;
     }
+
+    .wl-card-actions {
+        flex-wrap: wrap;
+    }
+
+    .wl-card-actions .btn {
+        flex: 1;
+        min-width: 0;
+        justify-content: center;
+        min-height: 44px;
+    }
+
+    .modal-header {
+        padding: 20px 16px 14px;
+    }
+
+    .modal-body {
+        padding: 16px;
+    }
+
+    .modal-footer {
+        padding: 14px 16px;
+        flex-direction: column;
+    }
+
+    .modal-footer .btn {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .watchlist-card {
+        padding: 16px;
+    }
+
+    .comp-avatar {
+        width: 36px;
+        height: 36px;
+        font-size: 0.9rem;
+    }
+
+    .comp-name {
+        font-size: 0.95rem;
+    }
+
+    .wl-stats-row {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
 }

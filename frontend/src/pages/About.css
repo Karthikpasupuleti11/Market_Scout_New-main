@@ -580,6 +580,76 @@
     }
 }
 
+@media (max-width: 768px) {
+    .about-visual-strip {
+        padding: 28px 20px;
+        min-height: 160px;
+    }
+
+    .about-strip-content h1 {
+        font-size: 1.6rem;
+    }
+
+    .about-strip-content p {
+        font-size: 0.92rem;
+    }
+
+    .about-hero-card {
+        padding: 20px;
+    }
+
+    .about-flow-card {
+        padding: 20px;
+    }
+
+    .flow-step {
+        grid-template-columns: 36px 1fr;
+        gap: 10px;
+    }
+
+    .flow-step-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 1rem;
+    }
+
+    .flow-step-arrow {
+        display: none;
+    }
+
+    .about-details-card {
+        padding: 20px;
+    }
+
+    .about-modal-content {
+        padding: 24px;
+        margin: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .about-strip-content h1 {
+        font-size: 1.3rem;
+    }
+
+    .about-visual-strip {
+        padding: 24px 16px;
+    }
+
+    .about-hero-tags span {
+        font-size: 0.68rem;
+        padding: 4px 8px;
+    }
+
+    .about-value-card {
+        padding: 18px;
+    }
+
+    .capability-card {
+        padding: 18px;
+    }
+}
+
 /* Modal CSS */
 .about-modal-overlay {
     position: fixed;
