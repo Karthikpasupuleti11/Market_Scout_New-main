@@ -205,3 +205,35 @@ def delete_report(db: Session, report_id: int) -> bool:
     db.delete(report)
     db.commit()
     return True
+
+
+def get_latest_report_matching_window(
+    db: Session,
+    company_name: str,
+    max_age_seconds: int = 21600,
+) -> Report | None:
+    """L2 cache lookup — find the most recent report within the time window.
+
+    Returns the Report ORM object (with features loaded) or None.
+    Used by the caching layer to re-warm Redis when L1 misses.
+    """
+    from datetime import datetime, timezone, timedelta
+
+    competitor = db.query(Competitor).filter(
+        Competitor.name.ilike(company_name)
+    ).first()
+
+    if not competitor:
+        return None
+
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=max_age_seconds)
+
+    return (
+        db.query(Report)
+        .filter(
+            Report.competitor_id == competitor.id,
+            Report.created_at >= cutoff,
+        )
+        .order_by(Report.created_at.desc())
+        .first()
+    )

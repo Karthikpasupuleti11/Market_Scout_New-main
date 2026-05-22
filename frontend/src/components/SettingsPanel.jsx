@@ -124,6 +124,27 @@ export default function SettingsPanel({ isOpen, onClose }) {
                 </div>
               </div>
 
+              {/* Force Fresh Analysis */}
+              <div className="setting-group">
+                <label className="setting-label">
+                  <span className="setting-label-text">Force Fresh Analysis</span>
+                  <span className="setting-hint">Bypass the 6-hour report cache and force a new web-scraping pipeline run</span>
+                </label>
+                <div className="setting-toggle-row">
+                  <button
+                    className={`setting-toggle ${settings.analysis.forceRefresh ? 'active' : ''}`}
+                    onClick={() => updateAnalysis({ forceRefresh: !settings.analysis.forceRefresh })}
+                    role="switch"
+                    aria-checked={settings.analysis.forceRefresh}
+                  >
+                    <span className="toggle-knob" />
+                  </button>
+                  <span className={`toggle-status ${settings.analysis.forceRefresh ? 'on' : ''}`}>
+                    {settings.analysis.forceRefresh ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+              </div>
+
           </div>
 
           <div className="settings-divider" />

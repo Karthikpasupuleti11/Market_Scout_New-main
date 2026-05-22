@@ -322,8 +322,9 @@
     font-size: 1.0625rem;
     line-height: 1.65;
     color: var(--text-secondary);
-    max-width: 750px;
+    max-width: 100%;
     margin-bottom: 24px;
+    text-align: justify;
 }
 
 .exec-comparison {
@@ -366,6 +367,7 @@
     line-height: 1.6;
     color: var(--text-muted);
     margin: 0;
+    text-align: justify;
 }
 
 
@@ -616,6 +618,7 @@
     line-height: 1.5;
     color: var(--text-muted);
     margin: 0 0 8px;
+    text-align: justify;
 }
 
 .sci-impact {
@@ -797,6 +800,48 @@
 }
 
 
+/* ═══════════════════════════════════════════════════════════════════
+   VISUAL ANALYTICS — Chart.js panels
+   ═══════════════════════════════════════════════════════════════════ */
+
+.comp-charts-card {
+    padding: 28px 32px;
+}
+
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.chart-panel {
+    padding: 20px;
+    border-radius: var(--radius-md);
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+}
+
+.chart-panel-sm {
+    flex: 1;
+    min-width: 200px;
+}
+
+.chart-panel-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin: 0 0 14px;
+    letter-spacing: -0.01em;
+}
+
+.charts-doughnut-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+
 /* ── Responsive ────────────────────────────────────────────────── */
 
 @media (max-width: 768px) {
@@ -807,8 +852,13 @@
     .exec-comparison,
     .strength-grid,
     .direction-grid,
-    .signals-comparison {
+    .signals-comparison,
+    .charts-grid {
         grid-template-columns: 1fr;
+    }
+
+    .charts-doughnut-row {
+        flex-direction: column;
     }
 }
 

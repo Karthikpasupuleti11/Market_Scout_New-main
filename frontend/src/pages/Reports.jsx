@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 
 import {
   HiOutlineSearch,
@@ -11,13 +11,17 @@ import {
   HiOutlineTrash,
   HiOutlineExclamationCircle,
   HiOutlineX,
+  HiOutlineSparkles,
 } from "react-icons/hi";
 import { getReports, deleteReport } from "../api";
 import { generateReportPDF } from "../utils/pdfExport";
+import ReportAssistant from '../components/ReportAssistant';
 import './Reports.css';
 
 export default function Reports() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const autoSearched = useRef(false);
 
   const [company, setCompany] = useState("");
   const [reports, setReports] = useState([]);
@@ -25,6 +29,7 @@ export default function Reports() {
   const [searched, setSearched] = useState(false);
   const [expanded, setExpanded] = useState(null);
   const [pdfLoadingIdx, setPdfLoadingIdx] = useState(null);
+  const assistantRefs = useRef({});
 
   // Delete modal state
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -64,6 +69,28 @@ export default function Reports() {
       setLoading(false);
     }
   };
+
+  // Auto-search if navigated from Watchlist with autoOpenCompany
+  useEffect(() => {
+    const auto = location.state?.autoOpenCompany;
+    if (auto && !autoSearched.current) {
+      autoSearched.current = true;
+      setCompany(auto);
+      // Trigger search after state update
+      (async () => {
+        setLoading(true);
+        setSearched(true);
+        try {
+          const data = await getReports(auto.trim());
+          setReports(Array.isArray(data) ? data : [data]);
+        } catch {
+          setReports([]);
+        } finally {
+          setLoading(false);
+        }
+      })();
+    }
+  }, [location.state]);
 
   function askDelete(report, idx) {
     setDeleteError('');
@@ -206,6 +233,19 @@ export default function Reports() {
                       )}
                     </button>
                     <button
+                      className="btn btn-primary btn-sm"
+                      onClick={e => { 
+                        e.stopPropagation(); 
+                        setExpanded(expanded === i ? expanded : i);
+                        setTimeout(() => {
+                          assistantRefs.current[i]?.triggerIndex();
+                        }, 100);
+                      }}
+                      title="Ask Report Assistant"
+                    >
+                      <HiOutlineSparkles /> Ask AI
+                    </button>
+                    <button
                       className="btn btn-danger btn-sm"
                       onClick={e => { e.stopPropagation(); askDelete(report, i); }}
                       title="Delete report"
@@ -243,6 +283,10 @@ export default function Reports() {
                         </div>
                       </div>
                     )}
+                    {/* Report Assistant RAG UI */}
+                    <div>
+                      <ReportAssistant report={report} ref={el => assistantRefs.current[i] = el} />
+                    </div>
                   </div>
                 )}
               </div>

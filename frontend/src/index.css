@@ -313,9 +313,9 @@ a:hover { color: var(--accent-secondary); }
   gap: 6px;
   padding: 8px 12px;
   border-radius: var(--radius-md);
-  color: var(--text-secondary);
+  color: var(--text-primary);
   border: 1px solid transparent;
-  font-size: 0.86rem;
+  font-size: 0.9rem;
   font-weight: 600;
   transition: all 0.2s ease;
 }
@@ -332,56 +332,36 @@ a:hover { color: var(--accent-secondary); }
   border-color: var(--border-accent);
 }
 
-.topbar-bell {
+/* Button variant of topbar-link (Tour, Notifications) */
+button.topbar-link {
+  background: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+
+/* Notification wrapper — positions the dropdown */
+.topbar-notif-wrapper {
   position: relative;
-  background: transparent;
-  border: none;
-  font-size: 1.35rem;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 6px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
 }
 
-.topbar-bell:hover {
-  color: var(--text-primary);
-  background: var(--bg-input);
-  transform: translateY(-1px);
-}
-
-.topbar-bell-dot {
+.topbar-notif-badge {
   position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
   background: var(--error);
-  border: 2px solid var(--bg-primary);
-}
-
-.topbar-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #E8D5B7, #C4A882);
+  color: #FFFFFF;
+  font-size: 0.62rem;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: #5D4E37;
-  cursor: pointer;
-  transition: box-shadow 0.15s;
-  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 3px var(--border-default);
-}
-
-.topbar-avatar:hover {
-  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 3px var(--border-accent);
+  padding: 0 4px;
+  line-height: 1;
+  pointer-events: none;
 }
 
 

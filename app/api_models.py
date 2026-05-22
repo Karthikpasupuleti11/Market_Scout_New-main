@@ -27,6 +27,10 @@ class AgentRequest(BaseModel):
         max_length=128,
         description="Client-generated session id used to isolate RAG indexes per device/browser",
     )
+    force_refresh: bool = Field(
+        False,
+        description="Bypass the 6-hour cache and force a fresh pipeline run",
+    )
 
 
 class FeatureItem(BaseModel):

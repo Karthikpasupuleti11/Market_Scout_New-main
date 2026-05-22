@@ -250,6 +250,22 @@
     color: var(--text-muted);
 }
 
+.stage-duration {
+    font-size: 0.62rem;
+    font-weight: 500;
+    color: var(--text-faint);
+    background: var(--bg-hover);
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 4px;
+    font-family: var(--font-mono);
+}
+
+.flow-label.active .stage-duration {
+    color: var(--success);
+    background: rgba(16, 185, 129, 0.15);
+}
+
 .pipeline-anim-bar {
     height: 3px;
     background: var(--bg-input);
@@ -364,7 +380,8 @@
     font-size: 1rem;
     line-height: 1.7;
     color: var(--text-secondary);
-    max-width: 700px;
+    max-width: 100%;
+    text-align: justify;
 }
 
 .executive-stats {
@@ -701,10 +718,7 @@
     font-size: 0.9375rem;
     font-weight: 700;
     color: var(--text-primary);
-    line-height: 1.3;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    line-height: 1.4;
 }
 
 .signal-toggle-btn {
@@ -732,11 +746,13 @@
 }
 
 .signal-description {
-    font-size: 0.875rem;
-    line-height: 1.65;
+    font-size: 0.84rem;
+    line-height: 1.6;
     color: var(--text-muted);
-    margin-bottom: 14px;
-    max-width: 700px;
+    margin: 0;
+    margin-bottom: 12px;
+    text-align: justify;
+    max-width: 100%;
 }
 
 .signal-impact {

@@ -1,4 +1,4 @@
-const API_BASE = 'https://api.market-scout.me';
+const API_BASE = 'http://localhost:8000';
 
 function getSessionId() {
     let sid = localStorage.getItem('rag_session_id');
@@ -20,6 +20,7 @@ export async function runPipeline(companyName, options = {}) {
             company_name: companyName,
             date_window_days: options.dateWindowDays,
             session_id: getSessionId(),
+            force_refresh: options.forceRefresh || false,
         }),
         signal: options.signal,
     });
@@ -104,10 +105,29 @@ export async function deleteSchedule(jobId) {
 
 
 
+// 🔹 RAG: Index Report
+export async function indexReport(report) {
+    const sessionId = `rag_${report.company_name.replace(/\s+/g, '_').toLowerCase()}`;
+    const res = await fetch(`${API_BASE}/rag/index`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            report: report,
+            session_id: sessionId,
+        }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || `Error ${res.status}`);
+    }
+    return res.json();
+}
+
 // 🔹 RAG: Ask Question
-export async function askRagQuestion(query) {
+export async function askRagQuestion(query, companyName) {
+    const sessionId = `rag_${companyName.replace(/\s+/g, '_').toLowerCase()}`;
     const res = await fetch(`${API_BASE}/rag/ask?query=${encodeURIComponent(query)}`, {
-        headers: { 'X-Session-Id': getSessionId() },
+        headers: { 'X-Session-Id': sessionId },
     });
 
     if (!res.ok) {

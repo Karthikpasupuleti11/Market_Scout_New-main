@@ -12,19 +12,64 @@ from observability.metrics import (
 from utils.feature_utils import _safe_feature
 from app.rag.service import process_report
 
-import asyncio
+# ── Node-to-stage mapping for PROGRESS tracking ─────────────
+# The graph nodes in execution order
+NODE_ORDER = [
+    "guardrails",
+    "search_agent",
+    "scraper_agent",
+    "date_validation",
+    "content_filter",
+    "authority_check",
+    "feature_extraction",
+    "verification",
+    "scoring",
+    "synthesis",
+]
 
 graph = build_graph()
 
 @celery.task(bind=True)
 def run_market_pipeline(self, company_name, date_window_days, session_id):
 
-    result = asyncio.run (
-        graph.ainvoke({
-            "company_name": company_name,
-            "date_window_days": date_window_days,
-        })
+    # ── Report progress before starting ────────────────
+    self.update_state(
+        state="PROGRESS",
+        meta={"current_node": "guardrails", "progress": 0}
     )
+
+    async def run_and_stream():
+        final_report = {}
+        final_error = None
+        
+        async for event in graph.astream(
+            {"company_name": company_name, "date_window_days": date_window_days},
+            stream_mode="updates"
+        ):
+            for node_name, state_updates in event.items():
+                
+                try:
+                    idx = NODE_ORDER.index(node_name)
+                    next_idx = idx + 1
+                    if next_idx < len(NODE_ORDER):
+                        next_node = NODE_ORDER[next_idx]
+                    else:
+                        next_node = node_name
+                except ValueError:
+                    next_node = node_name
+
+                self.update_state(
+                    state="PROGRESS",
+                    meta={"current_node": next_node, "progress": 0}
+                )
+                if "synthesis_report" in state_updates:
+                    final_report = state_updates["synthesis_report"]
+                if "error" in state_updates:
+                    final_error = state_updates["error"]
+                    
+        return {"synthesis_report": final_report, "error": final_error}
+
+    result = asyncio.run(run_and_stream())
 
     report = result.get("synthesis_report", {})
 
@@ -72,12 +117,7 @@ def run_market_pipeline(self, company_name, date_window_days, session_id):
         "metadata": report.get("metadata"),
     }
 
-    # ── Build conversational RAG index ─────────────────
 
-    try:
-        asyncio.run(process_report(response, session_id))
-    except Exception as e:
-        print("RAG processing failed:", e)
 
     # ── Save DB ─────────────────────────────
     try:
@@ -85,5 +125,12 @@ def run_market_pipeline(self, company_name, date_window_days, session_id):
         crud.save_report(db, company_name, report)
     except Exception as e:
         print("DB save failed:", e)
+
+    # ── Warm the report cache (L1) ─────────────────────
+    try:
+        from cache.report_cache import set_report_in_redis
+        set_report_in_redis(company_name, date_window_days, response)
+    except Exception as e:
+        print("Report cache warming failed:", e)
 
     return response

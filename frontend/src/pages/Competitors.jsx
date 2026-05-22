@@ -10,23 +10,19 @@ import {
     HiOutlineTrendingUp,
     HiOutlineTrendingDown,
     HiOutlineArrowRight,
+    HiOutlineDocumentText,
 } from 'react-icons/hi';
 import { getCompetitors, deleteCompetitor, getReports } from '../api';
 import { useSettings } from '../contexts/SettingsContext';
 import './Competitors.css';
 
-/* ── Time ago helper ───────────────────────────────────────────── */
-function timeAgo(dateStr) {
+/* ── Format exact date/time ───────────────────────────────────── */
+function formatDateTime(dateStr) {
     if (!dateStr) return '';
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const mins  = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days  = Math.floor(diff / 86400000);
-    if (mins < 1)    return 'Just now';
-    if (mins < 60)   return `${mins}m ago`;
-    if (hours < 24)  return `${hours}h ago`;
-    if (days < 7)    return `${days}d ago`;
-    return new Date(dateStr).toLocaleDateString([], { dateStyle: 'medium' });
+    return new Date(dateStr).toLocaleString([], {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+    });
 }
 
 /* ── Signal strength from feature count ────────────────────────── */
@@ -168,7 +164,7 @@ export default function Competitors() {
                                             )}
                                             {comp.created_at && (
                                                 <span className="wl-time-ago">
-                                                    <HiOutlineCalendar /> {timeAgo(comp.created_at)}
+                                                    <HiOutlineCalendar /> {formatDateTime(comp.created_at)}
                                                 </span>
                                             )}
                                         </div>
@@ -211,6 +207,14 @@ export default function Competitors() {
                                         })}
                                     >
                                         <HiOutlinePlay /> Analyze
+                                    </button>
+                                    <button
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => navigate('/reports', {
+                                            state: { autoOpenCompany: comp.name }
+                                        })}
+                                    >
+                                        <HiOutlineDocumentText /> Reports
                                     </button>
                                     <button
                                         className="btn btn-danger btn-sm"

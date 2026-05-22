@@ -25,6 +25,7 @@ from dotenv import load_dotenv
 from prometheus_client import make_asgi_app
 from celery.result import AsyncResult
 from tasks.pipeline_tasks import run_market_pipeline
+from app.services.pipeline_enqueue import enqueue_pipeline_or_cache
 
 
 load_dotenv()
@@ -216,16 +217,14 @@ def health_check():
 @app.post("/run-agent")
 async def run_agent(request: AgentRequest):
 
-    task = run_market_pipeline.delay(
-        request.company_name,
-        request.date_window_days,
-        request.session_id,
+    result = enqueue_pipeline_or_cache(
+        company_name=request.company_name,
+        date_window_days=request.date_window_days,
+        session_id=request.session_id,
+        force_refresh=request.force_refresh,
     )
 
-    return {
-        "task_id": task.id,
-        "status": "processing"
-    }
+    return result
 
 @app.get("/task-status/{task_id}")
 async def task_status(task_id: str):
@@ -238,9 +237,14 @@ async def task_status(task_id: str):
             "result": task.result
         }
 
-    return {
-        "status": task.status
-    }
+    # Forward PROGRESS metadata (current_node) for live stage tracking
+    response = {"status": task.status}
+    if task.status == "PROGRESS" and task.info:
+        response["meta"] = {
+            "current_node": task.info.get("current_node"),
+            "progress": task.info.get("progress"),
+        }
+    return response
 
 # ────────────────────────────────────────────────────────────────────
 # History & CRUD Endpoints

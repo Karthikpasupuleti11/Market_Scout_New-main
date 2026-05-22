@@ -11,6 +11,7 @@ import {
     HiOutlineClock as HiOutlinePending
 } from 'react-icons/hi';
 import { createSchedule, getSchedules, deleteSchedule } from '../api';
+import { useNotifications } from '../contexts/NotificationsContext';
 import './Schedule.css';
 
 export default function Schedule() {
@@ -27,6 +28,8 @@ export default function Schedule() {
     // Delete confirmation state
     const [confirmDelete, setConfirmDelete] = useState(null); // holds the job to delete
     const [deleting, setDeleting] = useState(false);
+
+    const { pushNotification } = useNotifications();
 
     useEffect(() => {
         loadJobs();
@@ -67,6 +70,11 @@ export default function Schedule() {
             setDate('');
             setTime('');
             await loadJobs();
+            pushNotification({
+                type: 'schedule',
+                title: `Schedule Created — ${company.trim()}`,
+                message: `Report scheduled for ${new Date(`${date}T${time}`).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}.`,
+            });
         } catch (err) {
             setError(err.message || 'Failed to schedule job');
         } finally {
@@ -80,6 +88,11 @@ export default function Schedule() {
         try {
             await deleteSchedule(confirmDelete.id);
             setJobs(jobs.filter(j => j.id !== confirmDelete.id));
+            pushNotification({
+                type: 'info',
+                title: `Schedule Deleted — ${confirmDelete.company_name}`,
+                message: 'The scheduled report has been removed.',
+            });
             setConfirmDelete(null);
         } catch (err) {
             setError(err.message);

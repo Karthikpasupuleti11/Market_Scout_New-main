@@ -368,6 +368,59 @@
   line-height: 1.4;
 }
 
+/* ── Setting Toggle (used by Force Fresh Analysis) ──────────── */
+.setting-toggle {
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  border: 2px solid #CBD5E1;
+  background: #CBD5E1;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  flex-shrink: 0;
+  padding: 0;
+  outline: none;
+}
+
+.setting-toggle.active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  box-shadow: 0 2px 8px rgba(46, 125, 50, 0.3);
+}
+
+.setting-toggle:hover {
+  box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.12);
+}
+
+.setting-toggle .toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.setting-toggle.active .toggle-knob {
+  left: 22px;
+}
+
+.toggle-status {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.toggle-status.on {
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
 
 
 /* ── Text Input ────────────────────────────────────────────────── */

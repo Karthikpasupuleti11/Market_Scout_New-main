@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, Link, useLocation } from 'react-router-dom';
-import { HiOutlineBell, HiOutlineInformationCircle, HiMenu, HiX } from 'react-icons/hi';
+import { HiOutlineBell, HiOutlineInformationCircle, HiOutlineQuestionMarkCircle, HiMenu, HiX } from 'react-icons/hi';
 import { SettingsProvider } from './contexts/SettingsContext';
-import { PipelineProvider } from './contexts/PipelineContext';   // ← NEW
+import { PipelineProvider } from './contexts/PipelineContext';
+import { NotificationsProvider, useNotifications } from './contexts/NotificationsContext';
 import Sidebar from './components/Sidebar';
+import NotificationPanel from './components/NotificationPanel';
 import GuidedTour, { hasTourBeenSeen } from './components/GuidedTour';
 import Dashboard from './pages/Dashboard';
 import RunPipeline from './pages/RunPipeline';
@@ -15,6 +17,9 @@ import About from './pages/About';
 
 
 function TopBar({ onStartTour, onToggleSidebar, sidebarOpen }) {
+  const [notifOpen, setNotifOpen] = useState(false);
+  const { unreadCount } = useNotifications();
+
   return (
     <div className="topbar">
       <button
@@ -41,19 +46,30 @@ function TopBar({ onStartTour, onToggleSidebar, sidebarOpen }) {
           <span>About Us</span>
         </NavLink>
         <button
-          className="tour-help-btn"
+          className="topbar-link"
           onClick={onStartTour}
-          title="Take a guided tour"
           aria-label="Start guided tour"
         >
-          ?
+          <HiOutlineQuestionMarkCircle />
+          <span>Tour</span>
         </button>
-        <button className="topbar-bell" aria-label="Notifications">
-          <HiOutlineBell />
-          <span className="topbar-bell-dot" />
-        </button>
-        <div className="topbar-avatar" title="User">
-          <span>U</span>
+        <div className="topbar-notif-wrapper">
+          <button
+            className={`topbar-link ${notifOpen ? 'active' : ''}`}
+            onClick={() => setNotifOpen(v => !v)}
+            aria-label="Notifications"
+            id="notifications-btn"
+          >
+            <HiOutlineBell />
+            <span>Notifications</span>
+            {unreadCount > 0 && (
+              <span className="topbar-notif-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
+            )}
+          </button>
+          <NotificationPanel
+            open={notifOpen}
+            onClose={() => setNotifOpen(false)}
+          />
         </div>
       </div>
     </div>
@@ -118,13 +134,13 @@ function AppContent() {
 export default function App() {
   return (
     <SettingsProvider>
-      {/* PipelineProvider sits OUTSIDE BrowserRouter so state survives
-          route changes — the fetch + timers live here, not in the page */}
-      <PipelineProvider>
-        <BrowserRouter>
-          <AppContent />
-        </BrowserRouter>
-      </PipelineProvider>
+      <NotificationsProvider>
+        <PipelineProvider>
+          <BrowserRouter>
+            <AppContent />
+          </BrowserRouter>
+        </PipelineProvider>
+      </NotificationsProvider>
     </SettingsProvider>
   );
 }

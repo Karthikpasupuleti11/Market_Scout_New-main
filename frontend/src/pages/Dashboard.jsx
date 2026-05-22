@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCompetitors, getHealth } from "../api";
+import { useSettings } from "../contexts/SettingsContext";
 import {
   HiOutlineLightningBolt,
   HiOutlineDocumentText,
@@ -16,6 +17,7 @@ export default function Dashboard() {
   const [competitors, setCompetitors] = useState([]);
   const [health, setHealth] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { settings } = useSettings();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -35,7 +37,7 @@ export default function Dashboard() {
   }, []);
 
   const latestRunDate = competitors[0]?.created_at
-    ? new Date(competitors[0].created_at).toLocaleDateString([], { dateStyle: 'medium' })
+    ? new Date(competitors[0].created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
     : 'No runs yet';
 
   const recentFocus = competitors[0]?.name || 'No company yet';
@@ -107,7 +109,7 @@ export default function Dashboard() {
         />
         <StatCard
           icon={<HiOutlineLightningBolt />}
-          value="7 Days"
+          value={`${settings.analysis.timeWindow} Days`}
           label="Recency Window"
           color="var(--warning)"
           bg="var(--warning-bg)"

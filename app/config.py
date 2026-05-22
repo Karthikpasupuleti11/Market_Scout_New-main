@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
     REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
     CACHE_EXPIRY: int = 21600           # 6 hours in seconds
+    REPORT_CACHE_TTL: int = 21600       # Report cache TTL (6 hours)
 
     # ── Security / OWASP ───────────────────────────────────────────
     MAX_INPUT_LENGTH: int = 200         # Max characters for company name

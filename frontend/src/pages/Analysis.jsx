@@ -12,6 +12,7 @@ import {
     HiOutlineSwitchHorizontal,
 } from 'react-icons/hi';
 import { getCompetitors, getReports } from '../api';
+import { CategoryRadarChart, SignalBarChart, CategoryDoughnutChart } from '../components/AnalysisCharts';
 import './Analysis.css';
 
 const MAX_ITEMS = 3;
@@ -457,6 +458,21 @@ export default function Analysis() {
                                     </div>
                                 );
                             })}
+                        </div>
+                    </div>
+
+                    {/* 2b. Visual Analytics — Chart.js */}
+                    <div className="card comp-charts-card fade-in-up">
+                        <h3 className="comp-section-title"><HiOutlineChartBar /> Visual Analytics</h3>
+                        <div className="charts-grid">
+                            <div className="chart-panel">
+                                <h4 className="chart-panel-title">Category Coverage</h4>
+                                <CategoryRadarChart comparisonData={comparisonData} />
+                            </div>
+                            <div className="chart-panel">
+                                <h4 className="chart-panel-title">Signal Strength</h4>
+                                <SignalBarChart comparisonData={comparisonData} />
+                            </div>
                         </div>
                     </div>
 

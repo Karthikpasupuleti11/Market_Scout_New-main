@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = {
   analysis: {
     timeWindow: 7,              // 7 | 14 | 30 days
     confidenceThreshold: 50,    // 50–90 slider (percentage)
+    forceRefresh: false,        // Bypass 6-hour cache when true
   },
 
   // ── 2. Watchlist ────────────────────────────────────────────────

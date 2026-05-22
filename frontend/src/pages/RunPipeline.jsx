@@ -17,13 +17,15 @@ import {
     HiOutlineSparkles,
 } from 'react-icons/hi';
 import { generateReportPDF } from '../utils/pdfExport';
+import ReportAssistant from '../components/ReportAssistant';
 import './RunPipeline.css';
-import { askRagQuestion } from '../api';
+
+
 
 const SUGGESTIONS = ['Google', 'OpenAI', 'Microsoft', 'Anthropic', 'Meta AI', 'Tesla'];
 
 const PIPELINE_STAGES = [
-    'Guardrails', 'Planning', 'Searching', 'Scraping',
+    'Guardrails', 'Searching', 'Scraping',
     'Validating', 'Filtering', 'Authority', 'Extracting',
     'Verifying', 'Scoring', 'Synthesizing'
 ];
@@ -82,6 +84,7 @@ export default function RunPipeline() {
         error,
         activeStage,
         elapsed,
+        stageTimings,
         executePipeline,
         stopPipeline,
     } = usePipeline();
@@ -94,15 +97,8 @@ export default function RunPipeline() {
     const [sortBy, setSortBy] = useState('confidence');
     const [expandedSignals, setExpandedSignals] = useState(new Set());
 
-    // RAG / sidebar state
-    const [ragMessages, setRagMessages] = useState([]);   // [{ role: 'user'|'ai', text, sources? }]
-    const [ragQuestion, setRagQuestion] = useState('');
-    const [ragLoading, setRagLoading] = useState(false);
-    const [sidebarOpen, setSidebarOpen] = useState(true);
-    const ragInputRef = useRef(null);
-    const ragScrollRef = useRef(null);
-
     const lastAutoRunCompanyRef = useRef('');
+    const assistantRef = useRef(null);
 
     const toggleSignal = useCallback((idx) => {
         setExpandedSignals(prev => {
@@ -114,13 +110,6 @@ export default function RunPipeline() {
     }, []);
 
     const report = result?.report || result;
-
-    // Auto-scroll RAG messages
-    useEffect(() => {
-        if (ragScrollRef.current) {
-            ragScrollRef.current.scrollTop = ragScrollRef.current.scrollHeight;
-        }
-    }, [ragMessages, ragLoading]);
 
     const handleDownloadPDF = async () => {
         if (!report) return;
@@ -138,7 +127,6 @@ export default function RunPipeline() {
         setExpandedSignals(new Set());
         setFilterCategory('all');
         setFilterConfidence('all');
-        setRagMessages([]);
         await executePipeline(company);
     };
 
@@ -219,52 +207,11 @@ export default function RunPipeline() {
     const strategicDirections = useMemo(() =>
         deriveStrategicDirections(report?.features), [report]);
 
-    // ── RAG handler — multi-turn ─────────────────────────────────
-    const handleAskReport = async () => {
-        const q = ragQuestion.trim();
-        if (!q || ragLoading) return;
-
-        setRagMessages(prev => [...prev, { role: 'user', text: q }]);
-        setRagQuestion('');
-        setRagLoading(true);
-
-        try {
-            const res = await askRagQuestion(q);
-            setRagMessages(prev => [
-                ...prev,
-                { role: 'ai', text: res.answer, sources: res.sources || [] }
-            ]);
-        } catch {
-            setRagMessages(prev => [
-                ...prev,
-                { role: 'ai', text: 'Unable to generate an answer. Please try again.', sources: [] }
-            ]);
-        } finally {
-            setRagLoading(false);
-            ragInputRef.current?.focus();
-        }
-    };
-
-    const handleRagKeyDown = (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleAskReport();
-        }
-    };
-
-    // Suggested starter questions
-    const STARTER_QUESTIONS = [
-        'What are the top strategic risks?',
-        'Summarise the key AI signals',
-        'Which signals have highest confidence?',
-        'What competitive threats exist?',
-    ];
-
     const hasResults = !!(result && report);
 
     return (
         /* Outer wrapper splits page into [main | sidebar] when results are shown */
-        <div className={`intelligence-page fade-in ${hasResults ? 'with-sidebar' : ''}`}>
+        <div className="intelligence-page fade-in">
 
             {/* ══════════════════════════════════════════════════════
                 MAIN COLUMN
@@ -335,6 +282,7 @@ export default function RunPipeline() {
                         company={company}
                         activeStage={activeStage}
                         elapsed={elapsed}
+                        stageTimings={stageTimings}
                     />
                 )}
 
@@ -366,19 +314,30 @@ export default function RunPipeline() {
                                         )}
                                     </div>
                                 </div>
-                                <button
-                                    className="btn btn-pdf"
-                                    onClick={handleDownloadPDF}
-                                    disabled={pdfLoading || loading}
-                                    title="Download report as PDF"
-                                    id="download-pdf-btn"
-                                >
-                                    {pdfLoading ? (
-                                        <><span className="spinner spinner-sm" /> Generating…</>
-                                    ) : (
-                                        <><HiOutlineDownload /> Download PDF</>
-                                    )}
-                                </button>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <button
+                                        className="btn btn-pdf"
+                                        onClick={handleDownloadPDF}
+                                        disabled={pdfLoading || loading}
+                                        title="Download report as PDF"
+                                        id="download-pdf-btn"
+                                    >
+                                        {pdfLoading ? (
+                                            <><span className="spinner spinner-sm" /> Generating…</>
+                                        ) : (
+                                            <><HiOutlineDownload /> Download PDF</>
+                                        )}
+                                    </button>
+                                    <button
+                                        className="btn btn-primary"
+                                        onClick={() => {
+                                            assistantRef.current?.triggerIndex();
+                                        }}
+                                        disabled={loading}
+                                    >
+                                        <HiOutlineSparkles /> Ask Report Assistant
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -509,11 +468,6 @@ export default function RunPipeline() {
                                             index={i}
                                             isExpanded={expandedSignals.has(i)}
                                             onToggle={() => toggleSignal(i)}
-                                            onAsk={(text) => {
-                                                setRagQuestion(text);
-                                                setSidebarOpen(true);
-                                                setTimeout(() => ragInputRef.current?.focus(), 100);
-                                            }}
                                         />
                                     ))}
                                 </div>
@@ -559,128 +513,20 @@ export default function RunPipeline() {
                             </div>
                         )}
 
+                        {/* Report Assistant RAG UI */}
+                        <div>
+                            <ReportAssistant report={report} ref={assistantRef} />
+                        </div>
+
                     </div>
                 )}
             </div>
-
-            {/* ══════════════════════════════════════════════════════
-                STICKY AI SIDEBAR — only rendered when results exist
-            ══════════════════════════════════════════════════════ */}
-            {hasResults && (
-                <aside className={`rag-sidebar ${sidebarOpen ? 'open' : 'collapsed'}`}>
-
-                    {/* Sidebar Header */}
-                    <div className="rag-sidebar-header">
-                        <div className="rag-sidebar-title">
-                            <HiOutlineSparkles className="rag-sparkle-icon" />
-                            <span>Ask AI</span>
-                            <span className="rag-sidebar-company">{report.company_name || company}</span>
-                        </div>
-                        <button
-                            className="rag-collapse-btn"
-                            onClick={() => setSidebarOpen(v => !v)}
-                            title={sidebarOpen ? 'Collapse' : 'Expand'}
-                        >
-                            {sidebarOpen ? <HiOutlineChevronDown /> : <HiOutlineChatAlt2 />}
-                        </button>
-                    </div>
-
-                    {sidebarOpen && (
-                        <>
-                            {/* Messages area */}
-                            <div className="rag-messages" ref={ragScrollRef}>
-                                {ragMessages.length === 0 ? (
-                                    <div className="rag-empty-state">
-                                        <div className="rag-empty-icon">
-                                            <HiOutlineChatAlt2 />
-                                        </div>
-                                        <p className="rag-empty-title">Ask anything about this report</p>
-                                        <p className="rag-empty-sub">I have full context of all signals, sources and insights.</p>
-                                        <div className="rag-starter-questions">
-                                            {STARTER_QUESTIONS.map((q, i) => (
-                                                <button
-                                                    key={i}
-                                                    className="rag-starter-chip"
-                                                    onClick={() => {
-                                                        setRagQuestion(q);
-                                                        ragInputRef.current?.focus();
-                                                    }}
-                                                >
-                                                    {q}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    ragMessages.map((msg, i) => (
-                                        <div key={i} className={`rag-msg rag-msg-${msg.role}`}>
-                                            {msg.role === 'ai' && (
-                                                <div className="rag-msg-avatar">
-                                                    <HiOutlineSparkles />
-                                                </div>
-                                            )}
-                                            <div className="rag-msg-bubble">
-                                                <p>{msg.text}</p>
-                                                {msg.sources?.length > 0 && (
-                                                    <div className="rag-msg-sources">
-                                                        <span className="rag-sources-label">Sources</span>
-                                                        {msg.sources.map((s, j) => (
-                                                            <div key={j} className="rag-source-chip">
-                                                                {s.text?.slice(0, 180)}…
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-
-                                {ragLoading && (
-                                    <div className="rag-msg rag-msg-ai">
-                                        <div className="rag-msg-avatar">
-                                            <HiOutlineSparkles />
-                                        </div>
-                                        <div className="rag-msg-bubble rag-thinking">
-                                            <span className="rag-dot" />
-                                            <span className="rag-dot" />
-                                            <span className="rag-dot" />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Input row */}
-                            <div className="rag-input-area">
-                                <input
-                                    ref={ragInputRef}
-                                    type="text"
-                                    className="input rag-sidebar-input"
-                                    placeholder="Ask about signals, trends, risks…"
-                                    value={ragQuestion}
-                                    onChange={e => setRagQuestion(e.target.value)}
-                                    onKeyDown={handleRagKeyDown}
-                                    disabled={ragLoading}
-                                />
-                                <button
-                                    className="rag-send-btn"
-                                    onClick={handleAskReport}
-                                    disabled={ragLoading || !ragQuestion.trim()}
-                                    title="Send"
-                                >
-                                    <HiOutlinePaperAirplane />
-                                </button>
-                            </div>
-                        </>
-                    )}
-                </aside>
-            )}
         </div>
     );
 }
 
 /* ── Signal Card ────────────────────────────────────────────────── */
-function SignalCard({ signal: f, index, isExpanded, onToggle, onAsk }) {
+function SignalCard({ signal: f, index, isExpanded, onToggle }) {
     const score = f.confidence_score ?? f.confidence;
     const pct = score != null ? Math.round(score * 100) : null;
     const level = score >= 0.7 ? 'high' : score >= 0.4 ? 'mid' : 'low';
@@ -734,16 +580,6 @@ function SignalCard({ signal: f, index, isExpanded, onToggle, onAsk }) {
                         {f.source_count && (
                             <span className="signal-meta">{f.source_count} source{f.source_count > 1 ? 's' : ''}</span>
                         )}
-                        {/* Ask AI about this signal */}
-                        <button
-                            className="signal-ask-ai-btn"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onAsk(`Tell me more about: ${f.title || f.feature_title}`);
-                            }}
-                        >
-                            <HiOutlineSparkles /> Ask AI
-                        </button>
                         {f.source_url && (
                             <a
                                 href={f.source_url}
@@ -762,7 +598,7 @@ function SignalCard({ signal: f, index, isExpanded, onToggle, onAsk }) {
 }
 
 /* ── Pipeline Animation ─────────────────────────────────────────── */
-function PipelineAnimation({ company, activeStage, elapsed }) {
+function PipelineAnimation({ company, activeStage, elapsed, stageTimings }) {
     const formatTime = (s) => {
         const m = Math.floor(s / 60);
         const sec = s % 60;
@@ -789,6 +625,18 @@ function PipelineAnimation({ company, activeStage, elapsed }) {
             <div className="pipeline-flow">
                 {PIPELINE_STAGES.map((stage, i) => {
                     const state = i < activeStage ? 'done' : i === activeStage ? 'active' : 'pending';
+                    
+                    // Calculate duration for this stage
+                    let durationText = '';
+                    if (stageTimings && stageTimings[i]) {
+                        const t = stageTimings[i];
+                        if (t.end && t.start) {
+                            durationText = `${Math.round((t.end - t.start) / 1000)}s`;
+                        } else if (t.start) {
+                            durationText = `${Math.round((Date.now() - t.start) / 1000)}s`;
+                        }
+                    }
+
                     return (
                         <div key={i} className="pipeline-flow-item">
                             <div className={`flow-node ${state}`}>
@@ -800,7 +648,10 @@ function PipelineAnimation({ company, activeStage, elapsed }) {
                                     <span className="flow-node-num">{i + 1}</span>
                                 )}
                             </div>
-                            <span className={`flow-label ${state}`}>{stage}</span>
+                            <span className={`flow-label ${state}`}>
+                                {stage}
+                                {durationText && <span className="stage-duration"> {durationText}</span>}
+                            </span>
                             {i < PIPELINE_STAGES.length - 1 && (
                                 <div className={`flow-connector ${i < activeStage ? 'done' : ''}`} />
                             )}

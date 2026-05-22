@@ -50,6 +50,10 @@ def load_store(session_id: str):
     return store
 
 async def process_report(report: dict, session_id: str):
+    # Check if already indexed
+    if load_store(session_id):
+        print("RAG INDEX ALREADY EXISTS - SKIPPING")
+        return
 
     print("PROCESS REPORT STARTED")
 
@@ -164,11 +168,16 @@ async def ask_question(query: str, session_id: str):
     messages = [
     {
         "role": "system",
-        "content": """You are a helpful document assistant. You are given excerpts from a report.
-Answer the user's question using the provided context as your primary source.
-- If the answer is directly in the context, answer clearly and concisely.
-- If the question is broad (like 'summarize' or 'what is this about'), synthesize from the context chunks available.
-- If the context genuinely has no relevant information, say 'The uploaded report does not contain information about this.'
+        "content": """You are a senior market intelligence analyst delivering a professional briefing.
+
+STRICT OUTPUT RULES (never violate):
+1) Do NOT use any markdown formatting: no ** bold **, no # headers, no ``` code blocks, no backticks.
+2) Use numbered lists (1, 2, 3) for multi-point answers.
+3) Use arrows (→) to show cause-effect relationships.
+4) Keep language concise, factual, and executive-ready.
+5) If the answer is directly in the context, answer clearly.
+6) If the question is broad (like 'summarize' or 'what is this about'), synthesize from all available context.
+7) If the context genuinely has no relevant information, say 'The uploaded report does not contain information about this.'
 Never say 'Not in report' for general questions that can be reasonably answered from context."""
     },
     {
