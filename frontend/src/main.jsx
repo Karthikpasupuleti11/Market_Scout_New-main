@@ -6,11 +6,13 @@ import * as Sentry from '@sentry/react'
 import Clarity from '@microsoft/clarity'
 
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN
+const sentryTraces = Number(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE ?? 0)
+
 if (sentryDsn) {
   Sentry.init({
     dsn: sentryDsn,
-    integrations: [Sentry.browserTracingIntegration()],
-    tracesSampleRate: 1.0,
+    integrations: sentryTraces > 0 ? [Sentry.browserTracingIntegration()] : [],
+    tracesSampleRate: sentryTraces,
     beforeSend(event, hint) {
       const error = hint?.originalException
       const msg = (error?.message || event?.message || '').toLowerCase()

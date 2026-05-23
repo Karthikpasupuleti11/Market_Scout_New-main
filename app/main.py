@@ -28,54 +28,12 @@ from tasks.pipeline_tasks import run_market_pipeline
 from app.services.pipeline_enqueue import enqueue_pipeline_or_cache
 
 import os
-import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
+from observability.sentry_init import init_sentry
 
 load_dotenv()
 
-
-def _sentry_before_send(event, hint):
-    """Filter out expected business-logic outcomes — keep only real errors."""
-    exc_info = hint.get("exc_info")
-    if exc_info:
-        exc_type, exc_value, _ = exc_info
-        msg = str(exc_value).lower()
-
-        # HTTPException 4xx are normal client errors, not bugs
-        if exc_type.__name__ == "HTTPException":
-            status = getattr(exc_value, "status_code", 500)
-            if 400 <= status < 500:
-                return None
-
-        # ValueError from guardrails = user sent bad input, not a bug
-        if exc_type is ValueError and any(kw in msg for kw in [
-            "blocked keyword", "rate limit", "invalid company",
-            "exceeds maximum length", "flagged as potentially malicious",
-        ]):
-            return None
-
-        # Expected pipeline outcomes — no data found
-        if any(kw in msg for kw in [
-            "no features extracted",
-            "no report",
-            "no synthesis report",
-            "empty report text",
-        ]):
-            return None
-
-    return event
-
-
-sentry_sdk.init(
-    dsn=os.environ.get("SENTRY_DSN_BACKEND", ""),
-    environment="development",
-    before_send=_sentry_before_send,
-    integrations=[
-        FastApiIntegration(),
-    ],
-    traces_sample_rate=1.0,
-    profiles_sample_rate=1.0,
-)
+init_sentry(integrations=[FastApiIntegration()])
 
 
 # ── Internal Imports ───────────────────────────────────────────────

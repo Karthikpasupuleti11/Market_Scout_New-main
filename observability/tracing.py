@@ -33,21 +33,26 @@ _tracer: Optional[trace.Tracer] = None
 def setup_tracing(app, service_name: str = "market-intelligence-scout"):
     """Initialise OpenTelemetry tracing and instrument FastAPI.
 
-    Call this once during app startup (lifespan hook).
+    Disabled by default — console span export adds I/O overhead on every request.
+    Set OTEL_ENABLED=true to turn on (development / Jaeger wiring).
     """
+    import os
+
+    if os.getenv("OTEL_ENABLED", "").strip().lower() not in ("1", "true", "yes"):
+        logger.info("TRACING — OpenTelemetry skipped (set OTEL_ENABLED=true to enable)")
+        return
+
     global _tracer
 
     resource = Resource.create({"service.name": service_name})
     provider = TracerProvider(resource=resource)
 
-    # Console exporter for development (swap for OTLP in production)
     processor = BatchSpanProcessor(ConsoleSpanExporter())
     provider.add_span_processor(processor)
 
     trace.set_tracer_provider(provider)
     _tracer = trace.get_tracer(__name__)
 
-    # Auto-instrument FastAPI
     FastAPIInstrumentor.instrument_app(app)
     logger.info("TRACING — OpenTelemetry initialised for '%s'", service_name)
 
