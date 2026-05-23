@@ -108,5 +108,8 @@ class Settings(BaseSettings):
         "credentials/token.json"
     )
 
+    # Comma-separated browser origins allowed for cross-origin API calls
+    CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "")
+
 
 settings = Settings()

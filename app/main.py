@@ -165,20 +165,6 @@ def register_routes(app):
 
 register_routes(app)
 
-# CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-    "http://localhost:5173",
-    "https://market-scout.me",
-    "https://www.market-scout.me",
-    "https://market-scout-new-main.vercel.app"
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # ── Mount Prometheus /metrics endpoint ─────────────────────────────
 metrics_app = make_asgi_app()
 app.mount("/metrics", metrics_app)
@@ -205,6 +191,37 @@ async def track_request_metrics(request: Request, call_next):
         REQUEST_LATENCY.labels(endpoint=endpoint).observe(duration)
 
     return response
+
+
+def _cors_allow_origins() -> List[str]:
+    """Explicit origins; regex below also allows market-scout.me subdomains."""
+    defaults = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://market-scout.me",
+        "http://www.market-scout.me",
+        "https://market-scout.me",
+        "https://www.market-scout.me",
+        "https://market-scout-new-main.vercel.app",
+    ]
+    extra = [
+        o.strip()
+        for o in (settings.CORS_ORIGINS or "").split(",")
+        if o.strip()
+    ]
+    return list(dict.fromkeys(defaults + extra))
+
+
+# CORS must be registered last so it wraps all responses (including errors).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_allow_origins(),
+    allow_origin_regex=r"https?://([\w-]+\.)?market-scout\.me(:\d+)?$",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
 
 
 # ────────────────────────────────────────────────────────────────────

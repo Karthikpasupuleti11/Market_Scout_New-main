@@ -1,4 +1,39 @@
-const API_BASE = 'http://localhost:8000';
+/**
+ * API base URL resolution:
+ * 1. VITE_API_URL if set (/api for same-origin proxy, or https://api.market-scout.me)
+ * 2. Dev: local FastAPI (or /api via vite.config.js proxy)
+ * 3. Production: https://api.market-scout.me (CORS allowed on backend)
+ */
+const API_BASE = (
+    import.meta.env.VITE_API_URL?.replace(/\/$/, '') ||
+    (import.meta.env.DEV ? 'http://localhost:8000' : 'https://api.market-scout.me')
+);
+
+async function apiFetch(path, options = {}) {
+    const url = `${API_BASE}${path}`;
+    try {
+        const res = await fetch(url, {
+            ...options,
+            headers: {
+                ...options.headers,
+            },
+        });
+        return res;
+    } catch (err) {
+        const host = (() => {
+            try {
+                return new URL(url).host;
+            } catch {
+                return API_BASE;
+            }
+        })();
+        throw new Error(
+            err?.message?.includes('fetch')
+                ? `Failed to reach the API (${host}). Check that the backend is running and CORS/proxy is configured.`
+                : err.message
+        );
+    }
+}
 
 function getSessionId() {
     let sid = localStorage.getItem('rag_session_id');
@@ -10,10 +45,10 @@ function getSessionId() {
     return sid;
 }
 
-export { getSessionId };
+export { getSessionId, API_BASE };
 
 export async function runPipeline(companyName, options = {}) {
-    const res = await fetch(`${API_BASE}/run-agent`, {
+    const res = await apiFetch('/run-agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -32,13 +67,13 @@ export async function runPipeline(companyName, options = {}) {
 }
 
 export async function getReports(companyName) {
-    const res = await fetch(`${API_BASE}/reports/${encodeURIComponent(companyName)}`);
+    const res = await apiFetch(`/reports/${encodeURIComponent(companyName)}`);
     if (!res.ok) throw new Error(`Error ${res.status}`);
     return res.json();
 }
 
 export async function deleteReport(reportId) {
-    const res = await fetch(`${API_BASE}/reports/${reportId}`, { method: 'DELETE' });
+    const res = await apiFetch(`/reports/${reportId}`, { method: 'DELETE' });
     if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: res.statusText }));
         throw new Error(err.detail || `Error ${res.status}`);
@@ -46,36 +81,35 @@ export async function deleteReport(reportId) {
 }
 
 export async function getFeatures(companyName) {
-    const res = await fetch(`${API_BASE}/features/${encodeURIComponent(companyName)}`);
+    const res = await apiFetch(`/features/${encodeURIComponent(companyName)}`);
     if (!res.ok) throw new Error(`Error ${res.status}`);
     return res.json();
 }
 
 export async function getCompetitors() {
-    const res = await fetch(`${API_BASE}/competitors`);
+    const res = await apiFetch('/competitors');
     if (!res.ok) throw new Error(`Error ${res.status}`);
     return res.json();
 }
 
 export async function getHealth() {
-    const res = await fetch(`${API_BASE}/health`);
+    const res = await apiFetch('/health');
     if (!res.ok) throw new Error(`Error ${res.status}`);
     return res.json();
 }
 
 export async function deleteCompetitor(competitorId) {
-    const res = await fetch(`${API_BASE}/competitors/${competitorId}`, {
+    const res = await apiFetch(`/competitors/${competitorId}`, {
         method: 'DELETE',
     });
     if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: res.statusText }));
         throw new Error(err.detail || `Error ${res.status}`);
     }
-    // 204 No Content — nothing to return
 }
 
 export async function createSchedule(data) {
-    const res = await fetch(`${API_BASE}/schedules`, {
+    const res = await apiFetch('/schedules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -88,13 +122,13 @@ export async function createSchedule(data) {
 }
 
 export async function getSchedules() {
-    const res = await fetch(`${API_BASE}/schedules`);
+    const res = await apiFetch('/schedules');
     if (!res.ok) throw new Error(`Error ${res.status}`);
     return res.json();
 }
 
 export async function deleteSchedule(jobId) {
-    const res = await fetch(`${API_BASE}/schedules/${jobId}`, {
+    const res = await apiFetch(`/schedules/${jobId}`, {
         method: 'DELETE',
     });
     if (!res.ok) {
@@ -103,13 +137,10 @@ export async function deleteSchedule(jobId) {
     }
 }
 
-
-
-// 🔹 RAG: Index Report
 export async function indexReport(report) {
     const name = report.company_name || report.competitor_name || 'default';
     const sessionId = `rag_${name.replace(/\s+/g, '_').toLowerCase()}`;
-    const res = await fetch(`${API_BASE}/rag/index`, {
+    const res = await apiFetch('/rag/index', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -124,11 +155,10 @@ export async function indexReport(report) {
     return res.json();
 }
 
-// 🔹 RAG: Ask Question
 export async function askRagQuestion(query, companyName) {
     const name = companyName || 'default';
     const sessionId = `rag_${name.replace(/\s+/g, '_').toLowerCase()}`;
-    const res = await fetch(`${API_BASE}/rag/ask?query=${encodeURIComponent(query)}`, {
+    const res = await apiFetch(`/rag/ask?query=${encodeURIComponent(query)}`, {
         headers: { 'X-Session-Id': sessionId },
     });
 
@@ -140,9 +170,8 @@ export async function askRagQuestion(query, companyName) {
     return res.json();
 }
 
-// 🔹 SYSTEM: Clear Cache
 export async function clearCache() {
-    const res = await fetch(`${API_BASE}/system/clear-cache`, { method: 'POST' });
+    const res = await apiFetch('/system/clear-cache', { method: 'POST' });
     if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: res.statusText }));
         throw new Error(err.detail || `Error ${res.status}`);
@@ -150,9 +179,8 @@ export async function clearCache() {
     return res.json();
 }
 
-// 🔹 SYSTEM: Clear Storage
 export async function clearStorage() {
-    const res = await fetch(`${API_BASE}/system/clear-storage`, { method: 'POST' });
+    const res = await apiFetch('/system/clear-storage', { method: 'POST' });
     if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: res.statusText }));
         throw new Error(err.detail || `Error ${res.status}`);
@@ -161,14 +189,9 @@ export async function clearStorage() {
 }
 
 export async function getTaskStatus(taskId) {
-
-    const res = await fetch(
-        `${API_BASE}/task-status/${taskId}`
-    );
-
+    const res = await apiFetch(`/task-status/${taskId}`);
     if (!res.ok) {
         throw new Error(`Error ${res.status}`);
     }
-
     return res.json();
 }
