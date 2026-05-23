@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     HiOutlineClock,
     HiOutlineCalendar,
@@ -24,6 +24,9 @@ export default function Schedule() {
     const [time, setTime] = useState('');
     const [scheduling, setScheduling] = useState(false);
     const [error, setError] = useState('');
+
+    const dateRef = useRef(null);
+    const timeRef = useRef(null);
 
     // Delete confirmation state
     const [confirmDelete, setConfirmDelete] = useState(null); // holds the job to delete
@@ -51,21 +54,21 @@ export default function Schedule() {
     const handleSchedule = async (e) => {
         e.preventDefault();
         if (!company.trim() || !email.trim() || !date || !time) return;
-        
+
         setScheduling(true);
         setError('');
-        
+
         try {
             // Combine date + time into UTC timezone
             // Browser timezone applies here
             const localDate = new Date(`${date}T${time}`);
-            
+
             await createSchedule({
                 company_name: company.trim(),
                 email: email.trim(),
                 scheduled_at: localDate.toISOString()
             });
-            
+
             setCompany('');
             setDate('');
             setTime('');
@@ -112,20 +115,20 @@ export default function Schedule() {
             </div>
 
             <div className="schedule-grid">
-                
+
                 {/* ── Schedule Form ──────────────────────────────────────── */}
                 <div className="card form-card stagger fade-in-up">
                     <h2 className="section-title section-title-spaced">
                         <HiOutlineCalendar className="section-title-icon" />
                         Create New Schedule
                     </h2>
-                    
+
                     {error && (
                         <div className="schedule-error schedule-error-spaced">
                             {error}
                         </div>
                     )}
-                    
+
                     <form onSubmit={handleSchedule} className="schedule-form">
                         <div className="input-group">
                             <label>Target Company</label>
@@ -160,33 +163,55 @@ export default function Schedule() {
                         <div className="date-time-grid">
                             <div className="input-group">
                                 <label>Date</label>
-                                <input
-                                    type="date"
-                                    className="input schedule-date"
-                                    value={date}
-                                    min={minDate}
-                                    onChange={e => setDate(e.target.value)}
-                                    required
-                                />
+                                <div className="input-wrap picker-wrap">
+                                    <button
+                                        type="button"
+                                        className="picker-icon-btn"
+                                        onClick={() => dateRef.current?.showPicker?.()}
+                                        tabIndex={-1}
+                                    >
+                                        <HiOutlineCalendar />
+                                    </button>
+                                    <input
+                                        ref={dateRef}
+                                        type="date"
+                                        className="input input-with-icon schedule-date"
+                                        value={date}
+                                        min={minDate}
+                                        onChange={e => setDate(e.target.value)}
+                                        required
+                                    />
+                                </div>
                             </div>
                             <div className="input-group">
                                 <label>Time</label>
-                                <input
-                                    type="time"
-                                    className="input schedule-time"
-                                    value={time}
-                                    onChange={e => setTime(e.target.value)}
-                                    required
-                                />
+                                <div className="input-wrap picker-wrap">
+                                    <button
+                                        type="button"
+                                        className="picker-icon-btn"
+                                        onClick={() => timeRef.current?.showPicker?.()}
+                                        tabIndex={-1}
+                                    >
+                                        <HiOutlineClock />
+                                    </button>
+                                    <input
+                                        ref={timeRef}
+                                        type="time"
+                                        className="input input-with-icon schedule-time"
+                                        value={time}
+                                        onChange={e => setTime(e.target.value)}
+                                        required
+                                    />
+                                </div>
                             </div>
                         </div>
 
-                        <button 
-                            type="submit" 
+                        <button
+                            type="submit"
                             className="btn btn-primary schedule-submit-btn"
                             disabled={scheduling || !company || !email || !date || !time}
                         >
-                            {scheduling ? <><span className="spinner spinner-sm"/> Scheduling…</> : <><HiOutlineClock /> Schedule Report</>}
+                            {scheduling ? <><span className="spinner spinner-sm" /> Scheduling…</> : <><HiOutlineClock /> Schedule Report</>}
                         </button>
                     </form>
                 </div>
@@ -219,16 +244,16 @@ export default function Schedule() {
                                             <StatusBadge status={job.status} />
                                         </div>
                                         <div className="job-meta">
-                                            <span><HiOutlineClock/> {new Date(job.scheduled_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
+                                            <span><HiOutlineClock /> {new Date(job.scheduled_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
                                             <span>•</span>
-                                            <span><HiOutlineMail/> {job.email}</span>
+                                            <span><HiOutlineMail /> {job.email}</span>
                                         </div>
                                         {job.status === 'failed' && job.error_msg && (
-                                        <div className="job-error-msg">{job.error_msg}</div>
+                                            <div className="job-error-msg">{job.error_msg}</div>
                                         )}
                                     </div>
-                                    
-                                    <button 
+
+                                    <button
                                         className="btn btn-sm btn-danger job-delete-btn"
                                         onClick={() => setConfirmDelete(job)}
                                         title="Delete schedule"
@@ -283,7 +308,7 @@ function StatusBadge({ status }) {
         case 'pending':
             return <span className="status-badge pending"><HiOutlinePending /> Pending</span>;
         case 'running':
-            return <span className="status-badge running"><span className="spinner spinner-sm mr-1" style={{borderWidth:'2px', width:'12px', height:'12px'}} /> Running</span>;
+            return <span className="status-badge running"><span className="spinner spinner-sm mr-1" style={{ borderWidth: '2px', width: '12px', height: '12px' }} /> Running</span>;
         case 'done':
             return <span className="status-badge done"><HiOutlineCheckCircle /> Done</span>;
         case 'failed':

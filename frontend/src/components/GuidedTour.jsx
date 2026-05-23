@@ -201,10 +201,10 @@ function computeLayout(targetRect, position) {
   if (!targetRect) return fallback;
 
   const pad = 18;
-  const tw = 380;  // tooltip width
-  const th = 260;  // tooltip approx height
   const vw = window.innerWidth;
   const vh = window.innerHeight;
+  const tw = Math.min(380, vw - 32);  // tooltip width — clamp to viewport on mobile
+  const th = 260;  // tooltip approx height
 
   // Target center
   const tcx = targetRect.left + targetRect.width / 2;
@@ -234,21 +234,36 @@ function computeLayout(targetRect, position) {
     Object.assign(arrowStyle, { bottom: -8, left: arrowLeft, borderLeft: 'none', borderTop: 'none' });
 
   } else if (position === 'right') {
-    tleft = targetRect.left + targetRect.width + pad;
-    ttop = Math.max(16, Math.min(tcy - th / 2, vh - th - 100));
-    tleft = Math.min(tleft, vw - tw - 16);
-
-    // Arrow: left edge, vertically aligned to target center
-    const arrowTop = Math.max(20, Math.min(tcy - ttop - 7, th - 30));
-    Object.assign(arrowStyle, { left: -8, top: arrowTop, borderRight: 'none', borderTop: 'none' });
+    // On small screens, fall back to bottom positioning
+    if (vw < 768) {
+      ttop = targetRect.top + targetRect.height + pad;
+      tleft = Math.max(16, Math.min(tcx - tw / 2, vw - tw - 16));
+      ttop = Math.min(ttop, vh - th - 100);
+      const arrowLeft = Math.max(20, Math.min(tcx - tleft - 7, tw - 30));
+      Object.assign(arrowStyle, { top: -8, left: arrowLeft, borderRight: 'none', borderBottom: 'none' });
+    } else {
+      tleft = targetRect.left + targetRect.width + pad;
+      ttop = Math.max(16, Math.min(tcy - th / 2, vh - th - 100));
+      tleft = Math.min(tleft, vw - tw - 16);
+      const arrowTop = Math.max(20, Math.min(tcy - ttop - 7, th - 30));
+      Object.assign(arrowStyle, { left: -8, top: arrowTop, borderRight: 'none', borderTop: 'none' });
+    }
 
   } else if (position === 'left') {
-    tleft = targetRect.left - tw - pad;
-    ttop = Math.max(16, Math.min(tcy - th / 2, vh - th - 100));
-    tleft = Math.max(16, tleft);
-
-    const arrowTop = Math.max(20, Math.min(tcy - ttop - 7, th - 30));
-    Object.assign(arrowStyle, { right: -8, top: arrowTop, borderLeft: 'none', borderBottom: 'none' });
+    // On small screens, fall back to bottom positioning
+    if (vw < 768) {
+      ttop = targetRect.top + targetRect.height + pad;
+      tleft = Math.max(16, Math.min(tcx - tw / 2, vw - tw - 16));
+      ttop = Math.min(ttop, vh - th - 100);
+      const arrowLeft = Math.max(20, Math.min(tcx - tleft - 7, tw - 30));
+      Object.assign(arrowStyle, { top: -8, left: arrowLeft, borderRight: 'none', borderBottom: 'none' });
+    } else {
+      tleft = targetRect.left - tw - pad;
+      ttop = Math.max(16, Math.min(tcy - th / 2, vh - th - 100));
+      tleft = Math.max(16, tleft);
+      const arrowTop = Math.max(20, Math.min(tcy - ttop - 7, th - 30));
+      Object.assign(arrowStyle, { right: -8, top: arrowTop, borderLeft: 'none', borderBottom: 'none' });
+    }
   }
 
   return {

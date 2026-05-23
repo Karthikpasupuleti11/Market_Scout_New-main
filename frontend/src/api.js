@@ -1,4 +1,4 @@
-const API_BASE = 'http://api.market-scout.me';
+const API_BASE = 'http://localhost:8000';
 
 function getSessionId() {
     let sid = localStorage.getItem('rag_session_id');

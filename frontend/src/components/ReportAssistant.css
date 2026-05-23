@@ -12,6 +12,8 @@
     overflow: hidden;
     transition: all 0.3s ease;
     scroll-margin-top: 100px;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .report-assistant.open {
@@ -87,7 +89,7 @@
 .ra-msg-row {
     display: flex;
     width: 100%;
-    align-items: flex-end; /* changed to bottom-align the bubbles/avatars */
+    align-items: flex-end;
 }
 
 .ra-msg-row.user {
@@ -105,8 +107,9 @@
     font-size: 0.9rem;
     line-height: 1.6;
     word-wrap: break-word;
+    overflow-wrap: break-word;
     position: relative;
-    white-space: pre-wrap; /* This fixes the markdown clumping */
+    white-space: pre-wrap;
     box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
 }
 
@@ -222,8 +225,8 @@
     font-size: 1.1rem;
     transform: translateX(-1px) rotate(90deg);
 }
-/* Add to ReportAssistant.css */
 
+/* ── Live Status ──────────────────────────────────────────────── */
 .ra-live-status {
     font-size: 0.7rem;
     font-weight: 500;
@@ -242,7 +245,7 @@
     animation: pulse-glow 2s infinite ease-in-out;
 }
 
-/* Indexing State */
+/* ── Indexing State ───────────────────────────────────────────── */
 .indexing-state {
     padding: 20px;
 }
@@ -283,13 +286,20 @@
     50% { opacity: 0.6; }
 }
 
-/* Chat Suggestions */
+/* ── Chat Suggestions ─────────────────────────────────────────── */
 .ra-suggestions {
     display: flex;
     flex-wrap: nowrap;
     gap: 8px;
     padding: 0 16px 12px;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.ra-suggestions::-webkit-scrollbar {
+    display: none;
 }
 
 .ra-sug-chip {
@@ -312,6 +322,7 @@
     border-color: var(--border-accent);
     color: var(--accent-primary);
 }
+
 /* ── Welcome Widget ────────────────────────────────────────────── */
 .ra-welcome-widget {
     display: flex;
@@ -356,6 +367,7 @@
     line-height: 1.5;
     max-width: 280px;
 }
+
 /* ── Pre-Index Empty State ───────────────────────────────────────── */
 .ra-status-pane.pre-index-state {
     padding: 40px 20px;
@@ -401,6 +413,7 @@
     70% { box-shadow: 0 0 0 10px rgba(46, 125, 50, 0); }
     100% { box-shadow: 0 0 0 0 rgba(46, 125, 50, 0); }
 }
+
 /* ── Indexing Animation ──────────────────────────────────────────── */
 .ra-status-pane.indexing-state {
     display: flex;
@@ -465,6 +478,10 @@
 /* ── Responsive ────────────────────────────────────────────────── */
 
 @media (max-width: 768px) {
+    .report-assistant {
+        margin-top: 16px;
+    }
+
     .ra-body {
         height: 320px;
     }
@@ -474,24 +491,24 @@
         gap: 12px;
     }
 
-    .ra-bubble {
+    .ra-msg-bubble {
         max-width: 90%;
         padding: 10px 14px;
         font-size: 0.84rem;
     }
 
-    .ra-input-bar {
+    .ra-input-area {
         padding: 10px 12px;
     }
 
-    .ra-input-bar input {
+    .ra-input {
         font-size: 0.875rem;
         min-height: 42px;
     }
 
-    .ra-input-bar button {
-        min-width: 42px;
-        min-height: 42px;
+    .ra-send-btn {
+        min-width: 36px;
+        min-height: 36px;
     }
 
     .ra-suggestions {
@@ -499,13 +516,22 @@
         gap: 6px;
     }
 
-    .ra-chip {
+    .ra-sug-chip {
         font-size: 0.72rem;
         padding: 5px 10px;
     }
 
     .ra-toggle {
         padding: 14px 16px;
+    }
+
+    .ra-welcome-text h4 {
+        font-size: 1rem;
+    }
+
+    .ra-welcome-text p {
+        font-size: 0.84rem;
+        max-width: 240px;
     }
 }
 
@@ -514,7 +540,7 @@
         height: 280px;
     }
 
-    .ra-bubble {
+    .ra-msg-bubble {
         max-width: 95%;
         font-size: 0.8rem;
     }
@@ -536,5 +562,14 @@
 
     .ra-indexing-text {
         font-size: 0.95rem;
+    }
+
+    .ra-input-area {
+        padding: 8px 10px;
+        gap: 6px;
+    }
+
+    .ra-input {
+        padding: 8px 12px;
     }
 }

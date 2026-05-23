@@ -16,11 +16,11 @@ import SettingsPanel from './SettingsPanel';
 import './Sidebar.css';
 
 const PRIMARY_NAV = [
-    { path: '/',            label: 'Overview',      icon: <HiOutlineGlobeAlt /> },
-    { path: '/intelligence', label: 'Intelligence',  icon: <HiOutlineLightningBolt /> },
-    { path: '/analysis',    label: 'Analysis',      icon: <HiOutlineChartBar /> },
-    { path: '/reports',     label: 'Reports',       icon: <HiOutlineDocumentText /> },
-    { path: '/watchlist',   label: 'Watchlist',     icon: <HiOutlineEye /> },
+    { path: '/', label: 'Overview', icon: <HiOutlineGlobeAlt /> },
+    { path: '/intelligence', label: 'Intelligence', icon: <HiOutlineLightningBolt /> },
+    { path: '/analysis', label: 'Analysis', icon: <HiOutlineChartBar /> },
+    { path: '/reports', label: 'Reports', icon: <HiOutlineDocumentText /> },
+    { path: '/watchlist', label: 'Watchlist', icon: <HiOutlineEye /> },
 ];
 
 const SECONDARY_NAV = [
@@ -30,10 +30,10 @@ const SECONDARY_NAV = [
 const FLOWER_URL = import.meta.env.VITE_FLOWER_URL || 'http://flower.market-scout.me';
 
 const EXTERNAL_LINKS = [
-    { href: 'http://api.market-scout.me/docs',  label: 'API Docs',   icon: <HiOutlineChartBar /> },
-    { href: 'http://metrics.market-scout.me',       label: 'Prometheus', icon: <SiPrometheus /> },
-    { href: 'http://grafana.market-scout.me',       label: 'Grafana',    icon: <SiGrafana /> },
-    { href: FLOWER_URL,                    label: 'Flower Tasks',     icon: <HiOutlineLightningBolt /> },
+    { href: 'http://localhost:8000/docs', label: 'API Docs', icon: <HiOutlineChartBar /> },
+    { href: 'http://localhost:9090', label: 'Prometheus', icon: <SiPrometheus /> },
+    { href: 'http://localhost:3000', label: 'Grafana', icon: <SiGrafana /> },
+    { href: 'http://localhost:5555', label: 'Flower Tasks', icon: <HiOutlineLightningBolt /> },
 ];
 
 export default function Sidebar({ mobileOpen = false, onClose }) {
