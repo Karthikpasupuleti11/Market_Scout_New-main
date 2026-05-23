@@ -74,7 +74,23 @@ def run_market_pipeline(self, company_name, date_window_days, session_id):
     report = result.get("synthesis_report", {})
 
     if not report:
-        raise Exception("Pipeline produced no report")
+        # Pipeline completed but produced no report — not a crash
+        print(f"PIPELINE — No report produced for '{company_name}' (possibly empty pipeline result)")
+        PIPELINE_RUNS.labels(status="no_data").inc()
+        return {
+            "company_name": company_name,
+            "generated_at": None,
+            "executive_summary": (
+                f"Analysis completed for '{company_name}', but no intelligence report "
+                f"could be generated. This typically happens when no recent articles "
+                f"are found within the configured time window."
+            ),
+            "features": [],
+            "total_sources_analysed": 0,
+            "total_features_verified": 0,
+            "all_sources": [],
+            "metadata": {"status": "no_data"},
+        }
 
     # ── Metrics ──────────────────────────────
     error = result.get("error") or report.get("metadata", {}).get("error")

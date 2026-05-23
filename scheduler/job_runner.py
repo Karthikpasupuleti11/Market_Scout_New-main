@@ -40,7 +40,24 @@ def run_scheduled_job(job_id: int, company_name: str, email: str, db_factory, gr
 
         features = report.get("features", [])
         if not features:
-            raise RuntimeError(f"No features extracted for '{company_name}'. Report not saved.")
+            # Graceful outcome — pipeline ran fine, just no recent signals
+            logger.info("SCHEDULER — Job %d completed with no features for '%s' "
+                        "(likely no recent news within the time window)", job_id, company_name)
+            no_data_msg = (
+                f"Analysis completed for '{company_name}', but no recent technical signals "
+                f"were found within the configured time window. "
+                f"This is normal — try again later or widen the recency window."
+            )
+            crud.update_job_status(db, job_id, status="no_data", error_msg=no_data_msg)
+            try:
+                send_report_email(
+                    {"executive_summary": no_data_msg, "features": [], "all_sources": []},
+                    company_name,
+                    email,
+                )
+            except Exception:
+                logger.warning("SCHEDULER — Could not send no-data email for Job %d", job_id)
+            return
 
         # ── 3. Save to DB ────────────────────────────────────────────
         saved_report = crud.save_report(db, company_name, report)
@@ -63,3 +80,4 @@ def run_scheduled_job(job_id: int, company_name: str, email: str, db_factory, gr
             pass
     finally:
         db.close()
+

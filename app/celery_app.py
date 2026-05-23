@@ -11,9 +11,37 @@ load_dotenv()
 _redis_host = os.environ.get("REDIS_HOST", "redis")
 _redis_port = os.environ.get("REDIS_PORT", "6379")
 
+
+def _sentry_before_send(event, hint):
+    """Filter out expected business-logic outcomes — keep only real errors."""
+    exc_info = hint.get("exc_info")
+    if exc_info:
+        exc_type, exc_value, _ = exc_info
+        msg = str(exc_value).lower()
+
+        # ValueError from guardrails / validation = expected user input issues
+        if exc_type is ValueError and any(kw in msg for kw in [
+            "blocked keyword", "rate limit", "invalid company",
+            "exceeds maximum length", "flagged as potentially malicious",
+        ]):
+            return None
+
+        # Expected pipeline outcomes — no data found
+        if any(kw in msg for kw in [
+            "no features extracted",
+            "no report",
+            "no synthesis report",
+            "empty report text",
+        ]):
+            return None
+
+    return event
+
+
 sentry_sdk.init(
     dsn=os.environ.get("SENTRY_DSN_BACKEND", ""),
     environment="development",
+    before_send=_sentry_before_send,
     integrations=[
         CeleryIntegration(),
     ],
