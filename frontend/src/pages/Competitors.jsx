@@ -15,6 +15,7 @@ import {
 import { getCompetitors, deleteCompetitor, getReports } from '../api';
 import { useSettings } from '../contexts/SettingsContext';
 import { WatchlistGridSkeleton } from '../components/SkeletonLoaders';
+import EmptyState from '../components/EmptyState';
 import './Competitors.css';
 
 /* ── Format exact date/time ───────────────────────────────────── */
@@ -112,14 +113,15 @@ export default function Competitors() {
             )}
 
             {!loading && competitors.length === 0 && (
-                <div className="empty-state">
-                    <div className="icon"><HiOutlineUserGroup /></div>
-                    <h3>No competitors tracked yet</h3>
-                    <p>Run the intelligence pipeline on a company to start tracking them.</p>
-                    <button className="btn btn-primary" style={{ marginTop: '16px' }} onClick={() => navigate('/intelligence')}>
-                        <HiOutlinePlay /> Run Intelligence
-                    </button>
-                </div>
+                <EmptyState
+                    illustration="competitors"
+                    title="No Competitors Tracked Yet"
+                    description="Start building your competitive intelligence landscape. Run the pipeline on a company to automatically track their technical signals."
+                    buttonText="Run Intelligence"
+                    buttonIcon={<HiOutlinePlay />}
+                    onClick={() => navigate('/intelligence')}
+                    hint="Tracked companies appear here with signal strength and latest insights"
+                />
             )}
 
             {!loading && competitors.length > 0 && (

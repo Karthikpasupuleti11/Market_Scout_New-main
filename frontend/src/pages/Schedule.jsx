@@ -13,6 +13,7 @@ import {
 import { createSchedule, getSchedules, deleteSchedule } from '../api';
 import { useNotifications } from '../contexts/NotificationsContext';
 import { ScheduleJobSkeleton } from '../components/SkeletonLoaders';
+import EmptyState from '../components/EmptyState';
 import './Schedule.css';
 
 export default function Schedule() {
@@ -229,10 +230,12 @@ export default function Schedule() {
                     {loadingJobs && jobs.length === 0 ? (
                         <ScheduleJobSkeleton count={3} />
                     ) : jobs.length === 0 ? (
-                        <div className="schedule-empty-state">
-                            <HiOutlineClock className="schedule-empty-icon" />
-                            <p>No active or past schedules</p>
-                        </div>
+                        <EmptyState
+                            illustration="schedule"
+                            title="No Scheduled Workflows"
+                            description="Create automated intelligence monitoring by scheduling pipeline runs. Get reports delivered to your inbox on your schedule."
+                            hint="Use the form on the left to schedule your first automated run"
+                        />
                     ) : (
                         <div className="jobs-list">
                             {jobs.map(job => (

@@ -14,6 +14,7 @@ import {
 import { getCompetitors, getReports } from '../api';
 import { CategoryRadarChart, SignalBarChart, CategoryDoughnutChart } from '../components/AnalysisCharts';
 import { AnalysisResultsSkeleton } from '../components/SkeletonLoaders';
+import EmptyState from '../components/EmptyState';
 import './Analysis.css';
 
 const MAX_ITEMS = 3;
@@ -602,16 +603,16 @@ export default function Analysis() {
 
             {/* Empty state */}
             {!loading && comparisonData.length === 0 && (
-                <div className="empty-state">
-                    <div className="icon"><HiOutlineChartBar /></div>
-                    <h3>{mode === 'timeline' ? 'Select a company and reports' : 'Select companies to compare'}</h3>
-                    <p>
-                        {mode === 'timeline'
-                            ? 'Choose a company and pick 2-3 report dates to compare intelligence over time.'
-                            : 'Choose 2-3 companies from your watchlist to generate a comparative intelligence analysis.'
-                        }
-                    </p>
-                </div>
+                <EmptyState
+                    illustration="analysis"
+                    title={mode === 'timeline' ? 'Select a Company and Reports' : 'Select Companies to Compare'}
+                    description={
+                        mode === 'timeline'
+                            ? 'Choose a company and pick 2–3 report dates to compare intelligence over time and track how signals evolve.'
+                            : 'Choose 2–3 companies from your watchlist to generate a comparative intelligence analysis with charts and signals.'
+                    }
+                    hint={mode === 'timeline' ? 'Timeline mode tracks signal evolution across reports' : 'Comparison mode surfaces competitive gaps and overlaps'}
+                />
             )}
         </div>
     );
