@@ -15,7 +15,7 @@ class ScheduledJob(Base):
     email        = Column(String, nullable=False)
     scheduled_at = Column(DateTime(timezone=True), nullable=False)
     status       = Column(String, default="pending")   # pending|running|done|failed
-    report_id    = Column(Integer, ForeignKey("reports.id"), nullable=True)
+    report_id    = Column(Integer, ForeignKey("reports.id", ondelete="SET NULL"), nullable=True)
     error_msg    = Column(Text, nullable=True)
     created_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 

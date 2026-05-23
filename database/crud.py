@@ -51,6 +51,15 @@ def update_job_status(db: Session, job_id: int, status: str,
         db.commit()
 
 
+def _detach_scheduled_jobs_from_reports(db: Session, report_ids: list[int]) -> None:
+    """Clear report_id on scheduled jobs so reports can be deleted safely."""
+    if not report_ids:
+        return
+    db.query(ScheduledJob).filter(
+        ScheduledJob.report_id.in_(report_ids)
+    ).update({ScheduledJob.report_id: None}, synchronize_session=False)
+
+
 # ────────────────────────────────────────────────────────────────────
 # Competitors
 # ────────────────────────────────────────────────────────────────────
@@ -87,11 +96,15 @@ def get_or_create_competitor(db: Session, name: str) -> Competitor:
 def delete_competitor(db: Session, competitor_id: int) -> bool:
     """Delete a competitor and all associated reports and features (cascade).
 
+    Scheduled jobs keep their history but lose the report link (report_id → NULL).
+
     Returns True if the competitor was found and deleted, False otherwise.
     """
     competitor = db.query(Competitor).filter(Competitor.id == competitor_id).first()
     if not competitor:
         return False
+    report_ids = [r.id for r in competitor.reports]
+    _detach_scheduled_jobs_from_reports(db, report_ids)
     db.delete(competitor)
     db.commit()
     return True
@@ -197,11 +210,14 @@ def get_all_features_for_competitor(db: Session, company_name: str, limit: int =
 def delete_report(db: Session, report_id: int) -> bool:
     """Delete a report and all its associated features (cascade).
 
+    Scheduled jobs that referenced this report keep their row; report_id is cleared.
+
     Returns True if the report was found and deleted, False otherwise.
     """
     report = db.query(Report).filter(Report.id == report_id).first()
     if not report:
         return False
+    _detach_scheduled_jobs_from_reports(db, [report_id])
     db.delete(report)
     db.commit()
     return True
