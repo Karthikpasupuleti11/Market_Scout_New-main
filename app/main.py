@@ -27,6 +27,18 @@ from celery.result import AsyncResult
 from tasks.pipeline_tasks import run_market_pipeline
 from app.services.pipeline_enqueue import enqueue_pipeline_or_cache
 
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+
+sentry_sdk.init(
+    dsn="https://7f5ad25450158194d3f084f7d3fffe60@o4511439056338944.ingest.de.sentry.io/4511439154053200",
+    environment="development",
+    integrations=[
+        FastApiIntegration(),
+    ],
+    traces_sample_rate=1.0,
+    profiles_sample_rate=1.0,
+)
 
 load_dotenv()
 

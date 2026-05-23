@@ -2,9 +2,20 @@ import os
 from celery import Celery
 from celery.signals import worker_process_init
 from prometheus_client import start_http_server
+import sentry_sdk
+from sentry_sdk.integrations.celery import CeleryIntegration
 
 _redis_host = os.environ.get("REDIS_HOST", "redis")
 _redis_port = os.environ.get("REDIS_PORT", "6379")
+
+sentry_sdk.init(
+    dsn="https://7f5ad25450158194d3f084f7d3fffe60@o4511439056338944.ingest.de.sentry.io/4511439154053200",
+    environment="development",
+    integrations=[
+        CeleryIntegration(),
+    ],
+    traces_sample_rate=1.0,
+)
 
 celery = Celery(
     "market_scout",
