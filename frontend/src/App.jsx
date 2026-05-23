@@ -11,6 +11,7 @@ import Dashboard from './pages/Dashboard';
 import RunPipeline from './pages/RunPipeline';
 import Analysis from './pages/Analysis';
 import Reports from './pages/Reports';
+import FeedbackWidget from './components/FeedbackWidget';
 import Competitors from './pages/Competitors';
 import Schedule from './pages/Schedule';
 import About from './pages/About';
@@ -127,6 +128,7 @@ function AppContent() {
         isOpen={tourOpen}
         onClose={() => setTourOpen(false)}
       />
+      <FeedbackWidget />
     </div>
   );
 }

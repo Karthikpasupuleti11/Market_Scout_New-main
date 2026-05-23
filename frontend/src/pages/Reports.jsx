@@ -169,6 +169,19 @@ export default function Reports() {
         <ReportsListSkeleton count={3} />
       )}
 
+      {!searched && !loading && reports.length === 0 && (
+        <div style={{ marginTop: '32px' }}>
+          <EmptyState
+            illustration="reports"
+            title="Intelligence Reports Library"
+            description="Access historical intelligence reports. Enter a company name above to search your generated reports, or start a new analysis to build your library."
+            buttonText="Run Intelligence"
+            buttonIcon={<HiOutlineSearch />}
+            onClick={() => navigate('/intelligence')}
+          />
+        </div>
+      )}
+
       {searched && !loading && reports.length === 0 && (
         <EmptyState
           illustration="reports"
@@ -233,8 +246,8 @@ export default function Reports() {
                     </button>
                     <button
                       className="btn btn-primary btn-sm"
-                      onClick={e => { 
-                        e.stopPropagation(); 
+                      onClick={e => {
+                        e.stopPropagation();
                         setExpanded(expanded === i ? expanded : i);
                         setTimeout(() => {
                           assistantRefs.current[i]?.triggerIndex();

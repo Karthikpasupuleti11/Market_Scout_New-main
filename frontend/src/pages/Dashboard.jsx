@@ -55,37 +55,37 @@ export default function Dashboard() {
         {loading ? (
           <DashboardHeroSkeleton />
         ) : (
-        <div className="card overview-hero-surface fade-in-up">
-          <div className="hero-content">
-            <div className="hero-badge">
-              <span className="hero-badge-dot" />
-              {health ? "All Systems Operational" : "Connecting..."}
-            </div>
-            <h1>Market Intelligence Overview</h1>
-            <p>AI-powered competitive intelligence — discover, verify, and track technical signals from public sources in real-time.</p>
-            {competitors.length > 0 && (
-              <div className="hero-last-run">
-                Last analysis: {competitors[0]?.created_at
-                  ? new Date(competitors[0].created_at).toLocaleDateString([], { dateStyle: 'medium' })
-                  : 'No runs yet'}
+          <div className="card overview-hero-surface fade-in-up">
+            <div className="hero-content">
+              <div className="hero-badge">
+                <span className="hero-badge-dot" />
+                {health ? "All Systems Operational" : "Connecting..."}
               </div>
-            )}
+              <h1>Market Intelligence Overview</h1>
+              <p>AI-powered competitive intelligence — discover, verify, and track technical signals from public sources in real-time.</p>
+              {competitors.length > 0 && (
+                <div className="hero-last-run">
+                  Last analysis: {competitors[0]?.created_at
+                    ? new Date(competitors[0].created_at).toLocaleDateString([], { dateStyle: 'medium' })
+                    : 'No runs yet'}
+                </div>
+              )}
+            </div>
+            <div className="hero-kpis">
+              <div className="hero-kpi">
+                <span>Last analyzed</span>
+                <strong>{latestRunDate}</strong>
+              </div>
+              <div className="hero-kpi">
+                <span>Recent focus</span>
+                <strong>{recentFocus}</strong>
+              </div>
+              <div className="hero-kpi">
+                <span>Data freshness</span>
+                <strong>{freshnessLabel}</strong>
+              </div>
+            </div>
           </div>
-          <div className="hero-kpis">
-            <div className="hero-kpi">
-              <span>Last analyzed</span>
-              <strong>{latestRunDate}</strong>
-            </div>
-            <div className="hero-kpi">
-              <span>Recent focus</span>
-              <strong>{recentFocus}</strong>
-            </div>
-            <div className="hero-kpi">
-              <span>Data freshness</span>
-              <strong>{freshnessLabel}</strong>
-            </div>
-          </div>
-        </div>
         )}
       </div>
 
@@ -93,36 +93,36 @@ export default function Dashboard() {
       {loading ? (
         <StatsGridSkeleton count={4} />
       ) : (
-      <div className="stats-grid stagger">
-        <StatCard
-          icon={<HiOutlineEye />}
-          value={competitors.length}
-          label="Tracked Companies"
-          color="var(--info)"
-          bg="var(--info-bg)"
-        />
-        <StatCard
-          icon={<HiOutlineShieldCheck />}
-          value={health ? "Online" : "—"}
-          label="System Status"
-          color="var(--success)"
-          bg="var(--success-bg)"
-        />
-        <StatCard
-          icon={<HiOutlineGlobeAlt />}
-          value="11"
-          label="Pipeline Stages"
-          color="var(--purple)"
-          bg="var(--purple-bg)"
-        />
-        <StatCard
-          icon={<HiOutlineLightningBolt />}
-          value={`${settings.analysis.timeWindow} Days`}
-          label="Recency Window"
-          color="var(--warning)"
-          bg="var(--warning-bg)"
-        />
-      </div>
+        <div className="stats-grid stagger">
+          <StatCard
+            icon={<HiOutlineEye />}
+            value={competitors.length}
+            label="Tracked Companies"
+            color="var(--info)"
+            bg="var(--info-bg)"
+          />
+          <StatCard
+            icon={<HiOutlineShieldCheck />}
+            value={health ? "Online" : "—"}
+            label="System Status"
+            color="var(--success)"
+            bg="var(--success-bg)"
+          />
+          <StatCard
+            icon={<HiOutlineGlobeAlt />}
+            value="11"
+            label="Pipeline Stages"
+            color="var(--purple)"
+            bg="var(--purple-bg)"
+          />
+          <StatCard
+            icon={<HiOutlineLightningBolt />}
+            value={`${settings.analysis.timeWindow} Days`}
+            label="Recency Window"
+            color="var(--warning)"
+            bg="var(--warning-bg)"
+          />
+        </div>
       )}
 
       {/* ── Quick Actions ────────────────────────────────────── */}

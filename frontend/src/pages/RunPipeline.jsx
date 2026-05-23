@@ -15,9 +15,12 @@ import {
     HiOutlineChatAlt2,
     HiOutlinePaperAirplane,
     HiOutlineSparkles,
+    HiOutlineTrash,
+    HiOutlineRefresh,
 } from 'react-icons/hi';
 import { generateReportPDF } from '../utils/pdfExport';
 import ReportAssistant from '../components/ReportAssistant';
+import EmptyState from '../components/EmptyState';
 import './RunPipeline.css';
 
 
@@ -87,6 +90,7 @@ export default function RunPipeline() {
         stageTimings,
         executePipeline,
         stopPipeline,
+        clearPipeline,
     } = usePipeline();
 
     // ── Local-only UI state ──────────────────────────────────────
@@ -259,6 +263,16 @@ export default function RunPipeline() {
                                 <HiOutlineXCircle /> Stop
                             </button>
                         )}
+                        {hasResults && !loading && (
+                            <button
+                                type="button"
+                                className="btn btn-outline"
+                                onClick={clearPipeline}
+                                style={{ height: '56px', padding: '0 24px', flexShrink: 0, borderColor: 'var(--border-default)', color: 'var(--text-muted)' }}
+                            >
+                                <HiOutlineTrash /> Clear
+                            </button>
+                        )}
                     </div>
 
                     <div className="intel-suggestions">
@@ -294,6 +308,17 @@ export default function RunPipeline() {
                             <h3>Analysis Failed</h3>
                             <p>{error}</p>
                         </div>
+                    </div>
+                )}
+
+                {/* ── Initial Empty State ────────────────────────── */}
+                {!loading && !hasResults && !error && (
+                    <div className="intel-empty-wrapper fade-in-up" style={{ marginTop: '32px' }}>
+                        <EmptyState
+                            illustration="analysis"
+                            title="Ready to Analyze"
+                            description="Enter a company name above to initiate the intelligence pipeline. The system will search, verify, and extract technical signals from public sources."
+                        />
                     </div>
                 )}
 
@@ -409,6 +434,19 @@ export default function RunPipeline() {
                                         </div>
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {(!report.features || report.features.length === 0) && (
+                            <div className="fade-in-up" style={{ marginTop: '32px' }}>
+                                <EmptyState
+                                    illustration="reports"
+                                    title="No Signals Extracted"
+                                    description="The intelligence pipeline completed successfully, but did not find any verified technical signals matching your criteria in the recent time window."
+                                    buttonText="Clear & Try Another"
+                                    buttonIcon={<HiOutlineRefresh />}
+                                    onClick={clearPipeline}
+                                />
                             </div>
                         )}
 
