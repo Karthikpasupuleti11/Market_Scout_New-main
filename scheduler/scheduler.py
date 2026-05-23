@@ -28,26 +28,22 @@ def get_scheduler() -> BackgroundScheduler:
 
 
 def schedule_job(job_id: int, run_at: datetime,
-                 company_name: str, email: str,
-                 db_factory, graph) -> None:
+                 company_name: str, email: str) -> None:
     """
-    Register a one-shot job that fires at `run_at` (UTC datetime).
+    Register a one-shot APScheduler trigger that enqueues a Celery task at `run_at` (UTC).
     """
-    from scheduler.job_runner import run_scheduled_job
+    from tasks.scheduled_tasks import run_scheduled_pipeline
+
+    def _enqueue():
+        run_scheduled_pipeline.delay(job_id, company_name, email)
+        logger.info("SCHEDULER — Job %d enqueued to Celery | company=%s", job_id, company_name)
 
     sched = get_scheduler()
     sched.add_job(
-        run_scheduled_job,
+        _enqueue,
         trigger=DateTrigger(run_date=run_at, timezone="UTC"),
         id=f"job_{job_id}",
-        kwargs={
-            "job_id":       job_id,
-            "company_name": company_name,
-            "email":        email,
-            "db_factory":   db_factory,
-            "graph":        graph,
-        },
-        misfire_grace_time=300,   # allow up to 5 min late firing
+        misfire_grace_time=300,
         replace_existing=True,
     )
     logger.info("SCHEDULER — Job %d scheduled for %s UTC | %s → %s",

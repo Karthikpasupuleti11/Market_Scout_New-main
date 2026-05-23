@@ -30,4 +30,5 @@ celery.conf.update(
 celery.conf.imports = (
     "tasks.pipeline_tasks",
     "tasks.serve_cached",
+    "tasks.scheduled_tasks",
 )

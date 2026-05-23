@@ -31,7 +31,7 @@ from app.services.pipeline_enqueue import enqueue_pipeline_or_cache
 load_dotenv()
 
 # ── Internal Imports ───────────────────────────────────────────────
-from database.session import engine, get_db, SessionLocal
+from database.session import engine, get_db
 from database.models import Base
 from database import crud, schemas
 from graph.builder import build_graph
@@ -314,7 +314,7 @@ def delete_competitor(competitor_id: int, db: Session = Depends(get_db)):
 # ────────────────────────────────────────────────────────────────────
 
 @app.post("/schedules", response_model=schemas.ScheduledJobResponse, tags=["Schedules"])
-def create_schedule(job: schemas.ScheduledJobCreate, request: Request, db: Session = Depends(get_db)):
+def create_schedule(job: schemas.ScheduledJobCreate, db: Session = Depends(get_db)):
     """Create a new scheduled report job."""
     # Ensure scheduled format is UTC
     if job.scheduled_at <= datetime.now(timezone.utc):
@@ -322,14 +322,12 @@ def create_schedule(job: schemas.ScheduledJobCreate, request: Request, db: Sessi
         
     db_job = crud.create_scheduled_job(db, job.company_name, job.email, job.scheduled_at)
     
-    # Add to APScheduler
+    # Add to APScheduler — enqueues into Celery when fired
     scheduler.schedule_job(
         job_id=db_job.id,
         run_at=job.scheduled_at,
         company_name=job.company_name,
         email=job.email,
-        db_factory=SessionLocal, # we need a factory for the background thread
-        graph=request.app.state.graph
     )
     
     return db_job
