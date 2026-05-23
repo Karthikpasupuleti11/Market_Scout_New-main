@@ -4,7 +4,6 @@ Market Intelligence Scout — Email Service
 Sends an HTML email with inline report content + a PDF attachment
 via Gmail SMTP (TLS on port 587).
 """
-from mcp_server.tools.gmail_tool import send_market_report
 import logging
 from datetime import datetime, timezone
 
@@ -445,12 +444,13 @@ def send_report_email(report: dict, company: str, recipient_email: str) -> None:
     except Exception as pdf_err:
         logger.warning("EMAIL — PDF generation failed (sending HTML only): %s", pdf_err)
 
-    # Send using Gmail API + MCP
+    from mcp_server.tools.gmail_tool import send_market_report
+
     send_market_report(
         recipient=recipient_email,
         company=company,
         html_body=html_body,
-        pdf_bytes=pdf_bytes
+        pdf_bytes=pdf_bytes,
     )
 
     logger.info(

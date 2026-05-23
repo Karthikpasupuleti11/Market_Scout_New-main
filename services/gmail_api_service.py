@@ -10,6 +10,7 @@ from app.config import settings
 
 
 from google.oauth2.credentials import Credentials
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
@@ -40,16 +41,26 @@ class GmailAPIService:
             )
 
         if not creds or not creds.valid:
-
             if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
+                try:
+                    creds.refresh(Request())
+                except RefreshError as exc:
+                    raise RuntimeError(
+                        "Gmail OAuth token expired or revoked. On the server, delete "
+                        "credentials/token.json and re-run OAuth setup (see README), or "
+                        "update the token file with a fresh authorized token."
+                    ) from exc
 
             else:
+                if not os.path.exists(cred_path):
+                    raise FileNotFoundError(
+                        f"Gmail credentials not found at {cred_path}. "
+                        "Add Google OAuth client JSON from Google Cloud Console."
+                    )
                 flow = InstalledAppFlow.from_client_secrets_file(
                     cred_path,
-                    SCOPES
+                    SCOPES,
                 )
-
                 creds = flow.run_local_server(port=0)
 
             with open(token_path, "w") as token:
