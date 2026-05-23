@@ -235,6 +235,10 @@
     color: #ef4444;
 }
 
+.job-error-msg.no-data-msg {
+    color: #d97706;
+}
+
 .status-badge {
     display: inline-flex;
     align-items: center;
@@ -260,6 +264,11 @@
 .status-badge.done {
     background: rgba(34, 197, 94, 0.15);
     color: #22c55e;
+}
+
+.status-badge.no-data {
+    background: rgba(217, 119, 6, 0.12);
+    color: #d97706;
 }
 
 .status-badge.failed {

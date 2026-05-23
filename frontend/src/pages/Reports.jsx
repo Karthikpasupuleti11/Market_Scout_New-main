@@ -16,6 +16,7 @@ import {
 import { getReports, deleteReport } from "../api";
 import { generateReportPDF } from "../utils/pdfExport";
 import ReportAssistant from '../components/ReportAssistant';
+import { ReportsListSkeleton } from '../components/SkeletonLoaders';
 import './Reports.css';
 
 export default function Reports() {
@@ -164,10 +165,7 @@ export default function Reports() {
       </form>
 
       {loading && (
-        <div className="card reports-loading-card">
-          <div className="spinner spinner-lg reports-loading-spinner" />
-          <p>Searching reports...</p>
-        </div>
+        <ReportsListSkeleton count={3} />
       )}
 
       {searched && !loading && reports.length === 0 && (

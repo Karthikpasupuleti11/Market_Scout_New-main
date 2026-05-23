@@ -14,6 +14,7 @@ import {
 } from 'react-icons/hi';
 import { getCompetitors, deleteCompetitor, getReports } from '../api';
 import { useSettings } from '../contexts/SettingsContext';
+import { WatchlistGridSkeleton } from '../components/SkeletonLoaders';
 import './Competitors.css';
 
 /* ── Format exact date/time ───────────────────────────────────── */
@@ -107,10 +108,7 @@ export default function Competitors() {
             </div>
 
             {loading && (
-                <div className="card" style={{ textAlign: 'center', padding: '48px 24px' }}>
-                    <div className="spinner spinner-lg" style={{ margin: '0 auto 12px' }} />
-                    <p style={{ color: 'var(--text-secondary)' }}>Loading watchlist...</p>
-                </div>
+                <WatchlistGridSkeleton count={4} />
             )}
 
             {!loading && competitors.length === 0 && (

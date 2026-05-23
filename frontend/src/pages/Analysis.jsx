@@ -13,6 +13,7 @@ import {
 } from 'react-icons/hi';
 import { getCompetitors, getReports } from '../api';
 import { CategoryRadarChart, SignalBarChart, CategoryDoughnutChart } from '../components/AnalysisCharts';
+import { AnalysisResultsSkeleton } from '../components/SkeletonLoaders';
 import './Analysis.css';
 
 const MAX_ITEMS = 3;
@@ -405,10 +406,7 @@ export default function Analysis() {
 
             {/* ── Loading ─────────────────────────────────────── */}
             {loading && (
-                <div className="card analysis-loading-card">
-                    <div className="spinner spinner-lg analysis-loading-spinner" />
-                    <p>Loading intelligence data...</p>
-                </div>
+                <AnalysisResultsSkeleton />
             )}
 
             {/* ═══════════════════════════════════════════════════

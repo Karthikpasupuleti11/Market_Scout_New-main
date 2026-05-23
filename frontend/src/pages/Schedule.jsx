@@ -12,6 +12,7 @@ import {
 } from 'react-icons/hi';
 import { createSchedule, getSchedules, deleteSchedule } from '../api';
 import { useNotifications } from '../contexts/NotificationsContext';
+import { ScheduleJobSkeleton } from '../components/SkeletonLoaders';
 import './Schedule.css';
 
 export default function Schedule() {
@@ -226,9 +227,7 @@ export default function Schedule() {
                     </div>
 
                     {loadingJobs && jobs.length === 0 ? (
-                        <div className="schedule-empty-state">
-                            <span className="spinner schedule-empty-spinner" /> Loading jobs...
-                        </div>
+                        <ScheduleJobSkeleton count={3} />
                     ) : jobs.length === 0 ? (
                         <div className="schedule-empty-state">
                             <HiOutlineClock className="schedule-empty-icon" />
@@ -248,8 +247,8 @@ export default function Schedule() {
                                             <span>•</span>
                                             <span><HiOutlineMail /> {job.email}</span>
                                         </div>
-                                        {job.status === 'failed' && job.error_msg && (
-                                            <div className="job-error-msg">{job.error_msg}</div>
+                                        {(job.status === 'failed' || job.status === 'no_data') && job.error_msg && (
+                                            <div className={`job-error-msg ${job.status === 'no_data' ? 'no-data-msg' : ''}`}>{job.error_msg}</div>
                                         )}
                                     </div>
 
@@ -311,6 +310,8 @@ function StatusBadge({ status }) {
             return <span className="status-badge running"><span className="spinner spinner-sm mr-1" style={{ borderWidth: '2px', width: '12px', height: '12px' }} /> Running</span>;
         case 'done':
             return <span className="status-badge done"><HiOutlineCheckCircle /> Done</span>;
+        case 'no_data':
+            return <span className="status-badge no-data"><HiOutlinePending /> No Data</span>;
         case 'failed':
             return <span className="status-badge failed"><HiOutlineXCircle /> Failed</span>;
         default:

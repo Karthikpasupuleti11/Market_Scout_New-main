@@ -10,6 +10,7 @@ import {
   HiOutlineGlobeAlt,
   HiOutlineChevronRight,
 } from "react-icons/hi";
+import { DashboardHeroSkeleton, StatsGridSkeleton } from "../components/SkeletonLoaders";
 import ThemeToggle from "./ThemeToggle";
 import './Dashboard.css';
 
@@ -51,6 +52,9 @@ export default function Dashboard() {
 
       {/* ── Hero Header ─────────────────────────────────────── */}
       <div className="overview-hero">
+        {loading ? (
+          <DashboardHeroSkeleton />
+        ) : (
         <div className="card overview-hero-surface fade-in-up">
           <div className="hero-content">
             <div className="hero-badge">
@@ -70,25 +74,29 @@ export default function Dashboard() {
           <div className="hero-kpis">
             <div className="hero-kpi">
               <span>Last analyzed</span>
-              <strong>{loading ? 'Loading...' : latestRunDate}</strong>
+              <strong>{latestRunDate}</strong>
             </div>
             <div className="hero-kpi">
               <span>Recent focus</span>
-              <strong>{loading ? 'Loading...' : recentFocus}</strong>
+              <strong>{recentFocus}</strong>
             </div>
             <div className="hero-kpi">
               <span>Data freshness</span>
-              <strong>{loading ? 'Loading...' : freshnessLabel}</strong>
+              <strong>{freshnessLabel}</strong>
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* ── Stats ────────────────────────────────────────────── */}
+      {loading ? (
+        <StatsGridSkeleton count={4} />
+      ) : (
       <div className="stats-grid stagger">
         <StatCard
           icon={<HiOutlineEye />}
-          value={loading ? "—" : competitors.length}
+          value={competitors.length}
           label="Tracked Companies"
           color="var(--info)"
           bg="var(--info-bg)"
@@ -115,6 +123,7 @@ export default function Dashboard() {
           bg="var(--warning-bg)"
         />
       </div>
+      )}
 
       {/* ── Quick Actions ────────────────────────────────────── */}
       <div className="actions-grid stagger">
