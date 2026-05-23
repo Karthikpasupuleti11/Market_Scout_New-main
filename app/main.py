@@ -194,7 +194,7 @@ async def track_request_metrics(request: Request, call_next):
 
 
 def _cors_allow_origins() -> List[str]:
-    """Explicit origins; regex below also allows market-scout.me subdomains."""
+    """Explicit origins; regex below also allows market-scout.me + vercel.app."""
     defaults = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
@@ -212,11 +212,23 @@ def _cors_allow_origins() -> List[str]:
     return list(dict.fromkeys(defaults + extra))
 
 
+# market-scout.me (any subdomain) and all *.vercel.app preview/production URLs
+_CORS_ORIGIN_REGEX = (
+    r"https?://"
+    r"("
+    r"([\w-]+\.)?market-scout\.me"
+    r"|"
+    r"[\w.-]+\.vercel\.app"
+    r")"
+    r"(:\d+)?$"
+)
+
+
 # CORS must be registered last so it wraps all responses (including errors).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_allow_origins(),
-    allow_origin_regex=r"https?://([\w-]+\.)?market-scout\.me(:\d+)?$",
+    allow_origin_regex=_CORS_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
