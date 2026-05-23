@@ -37,6 +37,7 @@ services:
       - DATABASE_URL=postgresql://admin:admin@postgres:5432/market_db
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - PYTHONPATH=/app
 
     depends_on:
       postgres:

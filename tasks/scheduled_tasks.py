@@ -5,6 +5,7 @@ from app.celery_app import celery
 from graph.builder import build_graph
 from database.session import SessionLocal
 from database import crud
+from scheduler.email_service import send_report_email
 
 logger = logging.getLogger(__name__)
 
@@ -13,8 +14,6 @@ graph = build_graph()
 
 @celery.task(bind=True)
 def run_scheduled_pipeline(self, job_id: int, company_name: str, email: str):
-    from scheduler.email_service import send_report_email
-
     db = SessionLocal()
     try:
         crud.update_job_status(db, job_id, status="running")
