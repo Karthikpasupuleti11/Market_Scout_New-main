@@ -115,6 +115,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _ensure_utc(dt: datetime) -> datetime:
+    """Normalize datetimes for safe comparison and APScheduler triggers."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
 
 # ────────────────────────────────────────────────────────────────────
 # App Lifecycle
@@ -393,20 +399,29 @@ def delete_competitor(competitor_id: int, db: Session = Depends(get_db)):
 @app.post("/schedules", response_model=schemas.ScheduledJobResponse, tags=["Schedules"])
 def create_schedule(job: schemas.ScheduledJobCreate, db: Session = Depends(get_db)):
     """Create a new scheduled report job."""
-    # Ensure scheduled format is UTC
-    if job.scheduled_at <= datetime.now(timezone.utc):
+    scheduled_at = _ensure_utc(job.scheduled_at)
+    if scheduled_at <= datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Scheduled time must be in the future.")
-        
-    db_job = crud.create_scheduled_job(db, job.company_name, job.email, job.scheduled_at)
-    
-    # Add to APScheduler — enqueues into Celery when fired
-    scheduler.schedule_job(
-        job_id=db_job.id,
-        run_at=job.scheduled_at,
-        company_name=job.company_name,
-        email=job.email,
+
+    db_job = crud.create_scheduled_job(
+        db, job.company_name, job.email, scheduled_at
     )
-    
+
+    try:
+        scheduler.schedule_job(
+            job_id=db_job.id,
+            run_at=scheduled_at,
+            company_name=job.company_name,
+            email=job.email,
+        )
+    except Exception as exc:
+        logger.exception("Failed to register APScheduler job %s", db_job.id)
+        crud.delete_scheduled_job(db, db_job.id)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not register scheduled job: {exc}",
+        ) from exc
+
     return db_job
 
 

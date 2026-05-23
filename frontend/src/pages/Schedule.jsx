@@ -45,9 +45,11 @@ export default function Schedule() {
     async function loadJobs() {
         try {
             const data = await getSchedules();
-            setJobs(data);
-        } catch {
+            setJobs(Array.isArray(data) ? data : []);
+            setError('');
+        } catch (err) {
             setJobs([]);
+            setError(err.message || 'Could not load schedules');
         } finally {
             setLoadingJobs(false);
         }

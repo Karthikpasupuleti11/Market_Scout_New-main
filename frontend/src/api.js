@@ -9,12 +9,24 @@ const API_BASE = (
     (import.meta.env.DEV ? 'http://localhost:8000' : 'https://api.market-scout.me')
 );
 
+function parseApiError(body, status) {
+    if (!body) return `Request failed (${status})`;
+    const { detail } = body;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) {
+        return detail.map((d) => d.msg || d.message || JSON.stringify(d)).join('; ');
+    }
+    if (typeof detail === 'object') return JSON.stringify(detail);
+    return body.message || `Request failed (${status})`;
+}
+
 async function apiFetch(path, options = {}) {
     const url = `${API_BASE}${path}`;
     try {
         const res = await fetch(url, {
             ...options,
             headers: {
+                'Content-Type': 'application/json',
                 ...options.headers,
             },
         });
@@ -60,8 +72,8 @@ export async function runPipeline(companyName, options = {}) {
         signal: options.signal,
     });
     if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(err.detail || `Error ${res.status}`);
+        const err = await res.json().catch(() => null);
+        throw new Error(parseApiError(err, res.status));
     }
     return res.json();
 }
@@ -111,19 +123,21 @@ export async function deleteCompetitor(competitorId) {
 export async function createSchedule(data) {
     const res = await apiFetch('/schedules', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
     });
     if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(err.detail || `Error ${res.status}`);
+        const err = await res.json().catch(() => null);
+        throw new Error(parseApiError(err, res.status));
     }
     return res.json();
 }
 
 export async function getSchedules() {
     const res = await apiFetch('/schedules');
-    if (!res.ok) throw new Error(`Error ${res.status}`);
+    if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(parseApiError(err, res.status));
+    }
     return res.json();
 }
 

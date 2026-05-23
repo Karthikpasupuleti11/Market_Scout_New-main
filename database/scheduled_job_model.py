@@ -17,6 +17,6 @@ class ScheduledJob(Base):
     status       = Column(String, default="pending")   # pending|running|done|failed
     report_id    = Column(Integer, ForeignKey("reports.id", ondelete="SET NULL"), nullable=True)
     error_msg    = Column(Text, nullable=True)
-    created_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at   = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     report = relationship("Report", foreign_keys=[report_id])
