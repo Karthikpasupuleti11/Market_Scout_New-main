@@ -28,12 +28,54 @@ from tasks.pipeline_tasks import run_market_pipeline
 from app.services.pipeline_enqueue import enqueue_pipeline_or_cache
 
 import os
+import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
-from observability.sentry_init import init_sentry
 
 load_dotenv()
 
-init_sentry(integrations=[FastApiIntegration()])
+
+def _sentry_before_send(event, hint):
+    """Filter out expected business-logic outcomes — keep only real errors."""
+    exc_info = hint.get("exc_info")
+    if exc_info:
+        exc_type, exc_value, _ = exc_info
+        msg = str(exc_value).lower()
+
+        # HTTPException 4xx are normal client errors, not bugs
+        if exc_type.__name__ == "HTTPException":
+            status = getattr(exc_value, "status_code", 500)
+            if 400 <= status < 500:
+                return None
+
+        # ValueError from guardrails = user sent bad input, not a bug
+        if exc_type is ValueError and any(kw in msg for kw in [
+            "blocked keyword", "rate limit", "invalid company",
+            "exceeds maximum length", "flagged as potentially malicious",
+        ]):
+            return None
+
+        # Expected pipeline outcomes — no data found
+        if any(kw in msg for kw in [
+            "no features extracted",
+            "no report",
+            "no synthesis report",
+            "empty report text",
+        ]):
+            return None
+
+    return event
+
+
+sentry_sdk.init(
+    dsn=os.environ.get("SENTRY_DSN_BACKEND", ""),
+    environment="development",
+    before_send=_sentry_before_send,
+    integrations=[
+        FastApiIntegration(),
+    ],
+    traces_sample_rate=1.0,
+    profiles_sample_rate=1.0,
+)
 
 
 # ── Internal Imports ───────────────────────────────────────────────
@@ -73,12 +115,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def _ensure_utc(dt: datetime) -> datetime:
-    """Normalize datetimes for safe comparison and APScheduler triggers."""
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
-
 
 # ────────────────────────────────────────────────────────────────────
 # App Lifecycle
@@ -113,7 +149,7 @@ async def lifespan(app: FastAPI):
 # ────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
-    title="Market Intelligence Scout 🚀",
+    title="Market Intelligence Scout",
     description=(
         "Enterprise-grade Market Intelligence System that extracts, verifies, "
         "and scores technical features from public sources."
@@ -158,7 +194,7 @@ async def track_request_metrics(request: Request, call_next):
 
 
 def _cors_allow_origins() -> List[str]:
-    """Explicit origins; regex below also allows market-scout.me + vercel.app."""
+    """Explicit origins; regex below also allows market-scout.me subdomains."""
     defaults = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
@@ -176,23 +212,11 @@ def _cors_allow_origins() -> List[str]:
     return list(dict.fromkeys(defaults + extra))
 
 
-# market-scout.me (any subdomain) and all *.vercel.app preview/production URLs
-_CORS_ORIGIN_REGEX = (
-    r"https?://"
-    r"("
-    r"([\w-]+\.)?market-scout\.me"
-    r"|"
-    r"[\w.-]+\.vercel\.app"
-    r")"
-    r"(:\d+)?$"
-)
-
-
 # CORS must be registered last so it wraps all responses (including errors).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_allow_origins(),
-    allow_origin_regex=_CORS_ORIGIN_REGEX,
+    allow_origin_regex=r"https?://([\w-]+\.)?market-scout\.me(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -357,29 +381,20 @@ def delete_competitor(competitor_id: int, db: Session = Depends(get_db)):
 @app.post("/schedules", response_model=schemas.ScheduledJobResponse, tags=["Schedules"])
 def create_schedule(job: schemas.ScheduledJobCreate, db: Session = Depends(get_db)):
     """Create a new scheduled report job."""
-    scheduled_at = _ensure_utc(job.scheduled_at)
-    if scheduled_at <= datetime.now(timezone.utc):
+    # Ensure scheduled format is UTC
+    if job.scheduled_at <= datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Scheduled time must be in the future.")
-
-    db_job = crud.create_scheduled_job(
-        db, job.company_name, job.email, scheduled_at
+        
+    db_job = crud.create_scheduled_job(db, job.company_name, job.email, job.scheduled_at)
+    
+    # Add to APScheduler — enqueues into Celery when fired
+    scheduler.schedule_job(
+        job_id=db_job.id,
+        run_at=job.scheduled_at,
+        company_name=job.company_name,
+        email=job.email,
     )
-
-    try:
-        scheduler.schedule_job(
-            job_id=db_job.id,
-            run_at=scheduled_at,
-            company_name=job.company_name,
-            email=job.email,
-        )
-    except Exception as exc:
-        logger.exception("Failed to register APScheduler job %s", db_job.id)
-        crud.delete_scheduled_job(db, db_job.id)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Could not register scheduled job: {exc}",
-        ) from exc
-
+    
     return db_job
 
 

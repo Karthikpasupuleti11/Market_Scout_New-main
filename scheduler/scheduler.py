@@ -31,15 +31,11 @@ def schedule_job(job_id: int, run_at: datetime,
                  company_name: str, email: str) -> None:
     """
     Register a one-shot APScheduler trigger that enqueues a Celery task at `run_at` (UTC).
-
-    Uses send_task by name so we never import scheduled_tasks (and Gmail) here.
     """
-    from app.celery_app import celery
-
-    task_name = "tasks.scheduled_tasks.run_scheduled_pipeline"
+    from tasks.scheduled_tasks import run_scheduled_pipeline
 
     def _enqueue():
-        celery.send_task(task_name, args=[job_id, company_name, email])
+        run_scheduled_pipeline.delay(job_id, company_name, email)
         logger.info("SCHEDULER — Job %d enqueued to Celery | company=%s", job_id, company_name)
 
     sched = get_scheduler()

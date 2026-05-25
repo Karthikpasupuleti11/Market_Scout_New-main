@@ -80,4 +80,3 @@ def run_scheduled_job(job_id: int, company_name: str, email: str, db_factory, gr
             pass
     finally:
         db.close()
-
