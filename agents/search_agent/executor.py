@@ -63,6 +63,8 @@ def execute_queries(
                 max_results=settings.SEARCH_MAX_RESULTS,
             )
         except Exception as exc:
+            import sentry_sdk
+            sentry_sdk.capture_exception(exc)
             logger.error("EXECUTOR — Tavily API error for query '%s': %s", query, exc)
             continue
 

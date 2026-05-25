@@ -264,6 +264,8 @@ async def invoke_llm(
             return content
 
         except Exception as exc:
+            import sentry_sdk
+            sentry_sdk.capture_exception(exc)
 
             duration = time.time() - start_time
 

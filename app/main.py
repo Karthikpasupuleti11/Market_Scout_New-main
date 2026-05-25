@@ -33,19 +33,27 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 
 load_dotenv()
 
-
 def _sentry_before_send(event, hint):
     """Filter out expected business-logic outcomes — keep only real errors."""
     exc_info = hint.get("exc_info")
     if exc_info:
         exc_type, exc_value, _ = exc_info
         msg = str(exc_value).lower()
+        exc_name = exc_type.__name__
 
         # HTTPException 4xx are normal client errors, not bugs
-        if exc_type.__name__ == "HTTPException":
+        if exc_name == "HTTPException":
             status = getattr(exc_value, "status_code", 500)
             if 400 <= status < 500:
                 return None
+
+        # Ignore safely handled third-party API exceptions (e.g. NVIDIA/Tavily retries)
+        if exc_name in ("PermissionDeniedError", "AuthenticationError", "RateLimitError"):
+            return None
+
+        # Ignore non-fatal Redis cache read-only errors
+        if exc_name == "ReadOnlyError" or "read only replica" in msg:
+            return None
 
         # ValueError from guardrails = user sent bad input, not a bug
         if exc_type is ValueError and any(kw in msg for kw in [
@@ -65,18 +73,14 @@ def _sentry_before_send(event, hint):
 
     return event
 
-
 sentry_sdk.init(
     dsn=os.environ.get("SENTRY_DSN_BACKEND", ""),
-    environment="development",
+    environment=os.environ.get("SENTRY_ENVIRONMENT", "production"),
     before_send=_sentry_before_send,
-    integrations=[
-        FastApiIntegration(),
-    ],
-    traces_sample_rate=1.0,
-    profiles_sample_rate=1.0,
+    integrations=[FastApiIntegration()],
+    traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", 0.0)),
+    profiles_sample_rate=float(os.environ.get("SENTRY_PROFILES_SAMPLE_RATE", 0.0)),
 )
-
 
 # ── Internal Imports ───────────────────────────────────────────────
 from database.session import engine, get_db

@@ -2,6 +2,7 @@ import os
 from celery import Celery
 from celery.signals import worker_process_init
 from prometheus_client import start_http_server
+
 import sentry_sdk
 from sentry_sdk.integrations.celery import CeleryIntegration
 from dotenv import load_dotenv
@@ -18,6 +19,15 @@ def _sentry_before_send(event, hint):
     if exc_info:
         exc_type, exc_value, _ = exc_info
         msg = str(exc_value).lower()
+        exc_name = exc_type.__name__
+
+        # Ignore safely handled third-party API exceptions (e.g. NVIDIA/Tavily retries)
+        if exc_name in ("PermissionDeniedError", "AuthenticationError", "RateLimitError"):
+            return None
+
+        # Ignore non-fatal Redis cache read-only errors
+        if exc_name == "ReadOnlyError" or "read only replica" in msg:
+            return None
 
         # ValueError from guardrails / validation = expected user input issues
         if exc_type is ValueError and any(kw in msg for kw in [
@@ -37,16 +47,14 @@ def _sentry_before_send(event, hint):
 
     return event
 
-
 sentry_sdk.init(
     dsn=os.environ.get("SENTRY_DSN_BACKEND", ""),
-    environment="development",
+    environment=os.environ.get("SENTRY_ENVIRONMENT", "production"),
     before_send=_sentry_before_send,
-    integrations=[
-        CeleryIntegration(),
-    ],
-    traces_sample_rate=1.0,
+    integrations=[CeleryIntegration()],
+    traces_sample_rate=float(os.environ.get("SENTRY_PIPELINE_TRACES_SAMPLE_RATE", 0.0)),
 )
+
 
 celery = Celery(
     "market_scout",

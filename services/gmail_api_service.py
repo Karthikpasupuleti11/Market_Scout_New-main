@@ -45,6 +45,8 @@ class GmailAPIService:
                 try:
                     creds.refresh(Request())
                 except RefreshError as exc:
+                    import sentry_sdk
+                    sentry_sdk.capture_exception(exc)
                     raise RuntimeError(
                         "Gmail OAuth token expired or revoked. On the server, delete "
                         "credentials/token.json and re-run OAuth setup (see README), or "
@@ -142,5 +144,7 @@ class GmailAPIService:
             return response
 
         except Exception as e:
+            import sentry_sdk
+            sentry_sdk.capture_exception(e)
             logger.exception("GMAIL API SEND FAILED")
             raise e
