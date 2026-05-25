@@ -96,11 +96,61 @@ A robust historical tracking layer using SQLAlchemy ORM.
   - Cache hit ratios (`redis_cache_hits_total`)
 - **Grafana Dashboard**: Visual representation of the Prometheus metrics for live operational monitoring.
 
-## 7. Minute Architecture Decisions
-- **LLM Selection**: Configured to use Nvidia Nim endpoints (e.g., `meta/llama-3.3-70b-instruct`). Prompts are highly constrained to prevent hallucinations. Max tokens increased to 4096 to handle rich summaries.
+## 7. Error Tracking & Analytics
+
+### Sentry — Real-Time Error Monitoring
+Integrated into **both frontend and backend** for production error tracking:
+- **Frontend** (`main.jsx`): Uses `@sentry/react` with `VITE_SENTRY_DSN` to capture uncaught React errors, promise rejections, and runtime exceptions.
+- **Backend** (`app/main.py`): Uses `sentry-sdk[fastapi]` with `FastApiIntegration` to capture API-level crashes and unhandled exceptions.
+- **Celery Workers** (`celery_app.py`): Uses `sentry-sdk` with `CeleryIntegration` to capture background task failures during pipeline execution.
+- **Smart Filtering**: A custom `before_send` hook silently drops expected, non-critical errors:
+  - HTTP 4xx client errors
+  - `PermissionDeniedError`, `AuthenticationError`, `RateLimitError` (safely retried API key failures)
+  - `ReadOnlyError` (transient Redis cache blips)
+  - `ValueError` from guardrails (blocked keywords, rate limits)
+  - Expected pipeline outcomes ("no features extracted", "no report")
+
+### Microsoft Clarity — Session Analytics
+Integrated via `@microsoft/clarity` in `main.jsx`:
+- Session recordings and replays
+- Click heatmaps, scroll depth, rage clicks
+- User engagement metrics
+- Configured via `VITE_CLARITY_PROJECT_ID` in the frontend `.env`.
+
+### Formspree — User Feedback Collection
+A floating feedback widget (`FeedbackWidget.jsx`) lets users submit feedback directly from the UI:
+- Submissions are sent to Formspree (no backend processing needed).
+- Configured via `VITE_FORMSPREE_ENDPOINT` in the frontend `.env`.
+
+## 8. Asynchronous Task Execution (Celery)
+The pipeline runs asynchronously via **Celery** with Redis as the broker:
+- `POST /run-agent` enqueues a task and immediately returns a `task_id`.
+- The frontend polls `GET /task-status/{task_id}` for real-time progress updates (`current_node`, `progress`).
+- Task results (success/failure) are stored in Redis and served back to the client.
+- Worker metrics are exported on port 9100 for Prometheus scraping.
+
+## 9. Scheduled Reports (APScheduler)
+Users can schedule future pipeline runs that automatically generate and email reports:
+- **APScheduler** manages scheduled jobs within the FastAPI process.
+- When a job fires, it enqueues a Celery task to run the full pipeline.
+- After pipeline completion, the report is rendered as a PDF and sent via the **Gmail API** (OAuth2).
+- Jobs are persisted in PostgreSQL (`scheduled_jobs` table) and survive server restarts.
+
+## 10. RAG — Report Q&A
+A retrieval-augmented generation (RAG) system allows users to ask questions about generated reports:
+- **PDF Upload** (`/rag/upload`): Parses uploaded PDFs, chunks the text, generates SBERT embeddings, and indexes them into a FAISS vector store (persisted in Redis).
+- **Question Answering** (`/rag/ask`): Retrieves the most relevant chunks via cosine similarity, then sends them as context to the LLM to generate an answer grounded in the report.
+
+## 11. MCP Server
+A **FastMCP** server (`mcp_server/server.py`) exposes the `send_email_report` tool, allowing external MCP-compatible clients to trigger email report delivery programmatically.
+
+## 12. Minute Architecture Decisions
+- **LLM Selection**: Configured to use NVIDIA NIM endpoints (`meta/llama-3.1-8b-instruct`). Prompts are highly constrained to prevent hallucinations. Max tokens set to 4096 to handle rich summaries.
+- **Multi-Key Load Balancing**: Multiple NVIDIA API keys are rotated round-robin with automatic cooldown on 429 rate limit errors.
 - **Cache Invalidation**: Redis keys are prefixed logically (`mscout:report:*`, `mscout:search_results:*`). TTL is universally set to 6 hours to balance data freshness with API cost savings.
 - **Data Caps Lifted**: Previous limits (e.g., max 10 features in synthesis, max 15 search results) were removed to ensure 100% data capture within the 7-day semantic window.
 - **Graceful Degradation**: 
   1. If HF Inference API goes down, it switches to a local model. 
   2. If Redis goes down, rate-limiting fails open but pipeline execution continues.
   3. If DB persistence fails, it logs a warning but still returns the report to the user.
+

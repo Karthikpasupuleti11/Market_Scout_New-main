@@ -36,7 +36,8 @@ BACKEND:
   • Python 3.10+           — Core language
   • FastAPI                 — REST API framework (async, auto-docs at /docs)
   • LangGraph              — Agentic pipeline orchestrator (graph-based workflow)
-  • NVIDIA NIM (meta/llama-3.3-70b-instruct) — LLM engine via OpenAI-compatible API
+  • Celery                 — Async task queue for pipeline execution
+  • NVIDIA NIM (meta/llama-3.1-8b-instruct) — LLM engine via OpenAI-compatible API
   • Tavily API              — Web search engine for finding latest articles
   • Sentence-BERT (SBERT)  — Semantic similarity for cross-source verification
   • PostgreSQL 15           — Relational database for persistent storage
@@ -44,10 +45,13 @@ BACKEND:
   • Redis 7                 — In-memory cache + rate limiting
   • Pydantic                — Request/response validation and settings
 
-OBSERVABILITY:
+OBSERVABILITY & INTEGRATIONS:
   • Prometheus              — Metrics collection (14 custom metrics)
   • Grafana                 — Dashboard visualization (16 panels, 4 sections)
   • OpenTelemetry           — Distributed tracing
+  • Sentry                  — Real-time error tracking (frontend + backend)
+  • Microsoft Clarity       — User session analytics and heatmaps
+  • Formspree               — User feedback collection widget
 
 FRONTEND:
   • React 19 + Vite         — SPA frontend framework
@@ -145,6 +149,10 @@ Market_Scout/
 ├── llm
 │   ├── __init__.py
 │   └── nvidia_client.py
+├── mcp_server
+│   ├── server.py
+│   └── tools
+│       └── gmail_tool.py
 ├── monitoring
 │   ├── prometheus.yml
 │   └── grafana
@@ -165,6 +173,16 @@ Market_Scout/
 │   ├── scoring.py
 │   ├── synthesis.py
 │   └── verification.py
+├── scheduler
+│   ├── email_service.py
+│   ├── job_runner.py
+│   └── scheduler.py
+├── services
+│   └── gmail_api_service.py
+├── tasks
+│   ├── pipeline_tasks.py
+│   ├── scheduled_tasks.py
+│   └── serve_cached.py
 |
 └── observability
     ├── __init__.py
@@ -472,6 +490,16 @@ GET /competitors
 POST /competitors
   Creates a new company entry in the database
 
+POST /schedules
+  Body: { "company_name": "...", "email": "...", "scheduled_at": "<ISO UTC>" }
+  Creates a scheduled job to run the pipeline later and email the report.
+
+POST /rag/upload
+  Uploads a PDF report, chunks it, and indexes into FAISS (stored in Redis).
+
+POST /rag/ask
+  Queries the indexed report chunks using RAG and returns an LLM-generated answer.
+
 GET /health
   Returns { status: "healthy", version: "2.0.0", timestamp: "..." }
 
@@ -620,6 +648,14 @@ Grafana Dashboard (monitoring/grafana/dashboards/market_scout.json):
     Row 2 "Pipeline Performance": Runs over time (stacked bars), Node latency (smooth lines)
     Row 3 "LLM & Intelligence": Calls by agent, Token usage, LLM latency, Confidence distribution
     Row 4 "Scraping & Cache": Strategy performance, Cache hit/miss, Features by category, Sources
+
+SENTRY ERROR TRACKING:
+  • Integrated in both frontend (React) and backend (FastAPI/Celery)
+  • Uses smart filtering (before_send) to ignore safe errors like HTTP 4xx, retried API 403s, and Redis read-only blips.
+
+MICROSOFT CLARITY & FORMSPREE:
+  • Clarity: Session recording, heatmaps, and rage click detection initialized in main.jsx.
+  • Formspree: Powers the floating FeedbackWidget.jsx in the frontend.
 
 
 ================================================================================
