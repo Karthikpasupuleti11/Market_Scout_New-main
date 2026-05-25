@@ -149,7 +149,7 @@ async def lifespan(app: FastAPI):
 # ────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
-    title="Market Intelligence Scout 🚀",
+    title="Market Intelligence Scout",
     description=(
         "Enterprise-grade Market Intelligence System that extracts, verifies, "
         "and scores technical features from public sources."
